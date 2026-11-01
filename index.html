@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Семейный бюджет</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--text:#1d2433;--muted:#6b7488;--line:#e3e7f0;--accent:#4361ee;--ok:#1f9d63;--bad:#d9383a;--warn:#e69a00}
+@media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2030;--text:#e8ecf6;--muted:#97a0b6;--line:#2a3147;--accent:#7b93ff;--ok:#41c98b;--bad:#ff6b6d;--warn:#ffc04d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 12px}
+h2{font-size:17px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.stat{background:var(--bg);border-radius:10px;padding:10px 12px}
+.stat .l{font-size:12px;color:var(--muted)}
+.stat .v{font-size:21px;font-weight:700;margin-top:2px}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}.muted{color:var(--muted)}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.bar.over>i{background:var(--bad)}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+input,select,textarea,button{font:inherit;color:var(--text)}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card)}
+button{padding:9px 14px;border:0;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600}
+button.sec{background:var(--bg);color:var(--text);border:1px solid var(--line)}
+button.del{background:transparent;color:var(--bad);padding:4px 8px}
+button.mini{background:transparent;color:var(--accent);padding:4px 8px}
+.row{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));align-items:end}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tabs button{background:var(--card);color:var(--text);border:1px solid var(--line)}
+.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right;white-space:nowrap}
+.cat-row{display:grid;grid-template-columns:110px 1fr 90px;gap:8px;align-items:center;margin:6px 0;font-size:14px}
+.cat-row .bar{margin:0}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700}
+.badge.ok{background:rgba(31,157,99,.15)}.badge.bad{background:rgba(217,56,58,.15)}
+.hide{display:none}
+.banner{background:rgba(67,97,238,.12);border:1px solid var(--accent);border-radius:12px;padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.tablewrap{overflow-x:auto}
+@media print{.tabs,.noprint,.banner{display:none!important}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>💰 Семейный бюджет</h1>
+  <div id="banner"></div>
+  <div class="tabs noprint" id="tabs">
+    <button data-t="home" class="on">Итоги</button>
+    <button data-t="exp">Траты</button>
+    <button data-t="rep">Недельный отчёт</button>
+    <button data-t="set">Настройки</button>
+  </div>
+
+  <!-- ИТОГИ -->
+  <section id="t-home">
+    <div class="card" id="homeTotals"></div>
+    <div class="card"><h2>Эта неделя</h2><div id="homeWeek"></div></div>
+    <div class="card"><h2>Категории (за всё время)</h2><div id="homeCats"></div></div>
+  </section>
+
+  <!-- ТРАТЫ -->
+  <section id="t-exp" class="hide">
+    <div class="card">
+      <h2 id="formTitle">Добавить трату</h2>
+      <form id="expForm">
+        <div class="row">
+          <div><label>Дата</label><input type="date" id="fDate" required></div>
+          <div><label>Сумма</label><input type="number" id="fAmount" min="0" step="0.01" inputmode="decimal" required></div>
+          <div><label>Категория</label><select id="fCat"></select></div>
+          <div><label>Комментарий</label><input id="fNote" placeholder="на что потратили"></div>
+          <div style="display:flex;gap:6px"><button type="submit" id="fSubmit">Добавить</button><button type="button" class="sec hide" id="fCancel">Отмена</button></div>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Внести историю трат списком</h2>
+      <p class="muted" style="margin-top:0;font-size:14px">Одна трата на строку: <b>дата сумма категория комментарий</b>.<br>
+      Например: <code>26.10 450 Продукты хлеб и молоко</code> или <code>2026-10-27 1200 Транспорт</code>. Новые категории создаются сами.</p>
+      <textarea id="bulk" rows="5" placeholder="26.10 450 Продукты&#10;27.10 1200 Транспорт бензин"></textarea>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center"><button id="bulkBtn">Импортировать</button><span id="bulkMsg" class="muted"></span></div>
+    </div>
+    <div class="card">
+      <h2>История трат</h2>
+      <div class="row" style="margin-bottom:10px">
+        <div><label>Месяц</label><select id="hMonth"></select></div>
+        <div><label>Категория</label><select id="hCat"></select></div>
+      </div>
+      <div class="tablewrap"><table><thead><tr><th>Дата</th><th>Категория</th><th>Комментарий</th><th class="n">Сумма</th><th></th></tr></thead><tbody id="hBody"></tbody></table></div>
+      <div id="hTotal" class="muted" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- ОТЧЁТ -->
+  <section id="t-rep" class="hide">
+    <div class="card noprint">
+      <div class="row">
+        <div><label>Неделя (пн–вс)</label><select id="rWeek"></select></div>
+        <div style="display:flex;gap:6px"><button id="rBtn">Сформировать отчёт</button><button class="sec" id="rPrint">Печать</button></div>
+      </div>
+    </div>
+    <div id="report"></div>
+    <div class="card"><h2>Все недели</h2><div class="tablewrap"><table><thead><tr><th>Неделя</th><th class="n">Потрачено</th><th class="n">Лимит</th><th class="n">Разница</th><th>Итог</th></tr></thead><tbody id="weeksBody"></tbody></table></div></div>
+  </section>
+
+  <!-- НАСТРОЙКИ -->
+  <section id="t-set" class="hide">
+    <div class="card">
+      <h2>Деньги и лимит</h2>
+      <div class="row">
+        <div><label>Общая сумма денег (весь бюджет)</label><input type="number" id="sTotal" min="0" step="0.01" inputmode="decimal"></div>
+        <div><label>Лимит трат в неделю</label><input type="number" id="sLimit" min="0" step="0.01" inputmode="decimal"></div>
+        <div><label>Валюта</label><input id="sCur" maxlength="4"></div>
+        <div><button id="sSave">Сохранить</button></div>
+      </div>
+      <p class="muted" style="font-size:13px;margin-bottom:0">«Общая сумма» — сколько денег у вас было на старте. Из неё вычитаются все внесённые траты.</p>
+    </div>
+    <div class="card">
+      <h2>Категории</h2>
+      <div id="catList"></div>
+      <div class="row" style="margin-top:10px"><div><label>Новая категория</label><input id="newCat"></div><div><button id="addCat">Добавить</button></div></div>
+    </div>
+    <div class="card">
+      <h2>Резервная копия</h2>
+      <p class="muted" style="font-size:13px;margin-top:0">Данные хранятся в этом браузере. Сохраните файл, чтобы перенести на другое устройство или не потерять.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="exp" class="sec">Скачать данные</button><button id="impBtn" class="sec">Загрузить из файла</button><input type="file" id="impFile" accept=".json" class="hide"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const KEY='family-budget-v1';
+const DEF={settings:{total:0,weekLimit:0,cur:'₽'},cats:['Продукты','Транспорт','Дом','Кафе','Развлечения','Здоровье','Одежда','Прочее'],exp:[]};
+let S=load();
+let editId=null;
+
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.settings)return d}catch(e){}return JSON.parse(JSON.stringify(DEF))}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){alert('Не удалось сохранить в браузере')}}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---- даты ---- */
+const pad=n=>String(n).padStart(2,'0');
+const fmt=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parse=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return fmt(d)};
+const mondayOf=s=>{const d=parse(s);const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return fmt(d)};
+const today=()=>fmt(new Date());
+const showD=s=>{const d=parse(s);return pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'+d.getFullYear()};
+const weekLabel=m=>showD(m).slice(0,5)+' – '+showD(addDays(m,6));
+const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const MON=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+
+/* ---- деньги ---- */
+const money=n=>{const v=Math.round(n*100)/100;return v.toLocaleString('ru-RU',{maximumFractionDigits:2})+' '+S.settings.cur};
+const sum=a=>a.reduce((s,e)=>s+e.amount,0);
+const inWeek=(m)=>S.exp.filter(e=>e.date>=m&&e.date<=addDays(m,6));
+function weeksList(){
+  const cur=mondayOf(today());
+  let first=cur;
+  S.exp.forEach(e=>{const m=mondayOf(e.date);if(m<first)first=m});
+  const out=[];for(let m=first;m<=cur;m=addDays(m,7))out.push(m);
+  return out;
+}
+function weekInfo(m){
+  const items=inWeek(m),spent=sum(items),limit=S.settings.weekLimit;
+  return{m,items,spent,limit,diff:limit-spent,end:addDays(m,6)};
+}
+
+/* ---- табы ---- */
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
+function tab(t){
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  ['home','exp','rep','set'].forEach(x=>$('t-'+x).classList.toggle('hide',x!==t));
+  if(t==='rep')renderReport();
+}
+
+/* ---- итоги ---- */
+function catBars(items,limitTotal){
+  const by={};items.forEach(e=>by[e.cat]=(by[e.cat]||0)+e.amount);
+  const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]);
+  const tot=sum(items);
+  if(!rows.length)return'<div class="muted">Трат пока нет</div>';
+  return rows.map(([c,v])=>`<div class="cat-row"><span>${esc(c)}</span><div class="bar"><i style="width:${tot?v/tot*100:0}%"></i></div><span style="text-align:right">${money(v)} <span class="muted">${tot?Math.round(v/tot*100):0}%</span></span></div>`).join('');
+}
+function renderHome(){
+  const spent=sum(S.exp),total=S.settings.total,left=total-spent;
+  $('homeTotals').innerHTML=`<div class="grid">
+    <div class="stat"><div class="l">Всего денег</div><div class="v">${money(total)}</div></div>
+    <div class="stat"><div class="l">Потрачено всего</div><div class="v">${money(spent)}</div></div>
+    <div class="stat"><div class="l">Осталось</div><div class="v ${left<0?'bad':'ok'}">${money(left)}</div></div></div>`;
+  const w=weekInfo(mondayOf(today())),L=w.limit;
+  const pct=L?Math.min(100,w.spent/L*100):0;
+  const daysLeft=7-((parse(today()).getDay()+6)%7);
+  $('homeWeek').innerHTML=`<div class="muted" style="margin-bottom:8px">${weekLabel(w.m)}</div>
+    <div class="grid">
+    <div class="stat"><div class="l">Лимит недели</div><div class="v">${money(L)}</div></div>
+    <div class="stat"><div class="l">Потрачено</div><div class="v">${money(w.spent)}</div></div>
+    <div class="stat"><div class="l">${w.diff<0?'Перерасход':'Можно потратить'}</div><div class="v ${w.diff<0?'bad':'ok'}">${money(Math.abs(w.diff))}</div></div>
+    <div class="stat"><div class="l">В день до воскресенья</div><div class="v">${w.diff>0?money(w.diff/daysLeft):'—'}</div></div></div>
+    <div class="bar ${w.diff<0?'over':''}"><i style="width:${pct}%"></i></div>`;
+  $('homeCats').innerHTML=catBars(S.exp);
+  const isSun=parse(today()).getDay()===0;
+  $('banner').innerHTML=isSun?`<div class="banner"><span>📅 Сегодня воскресенье — пора подвести итоги недели!</span><button id="goRep">Сформировать отчёт</button></div>`:'';
+  if(isSun)$('goRep').onclick=()=>{$('rWeek').value=mondayOf(today());tab('rep')};
+}
+
+/* ---- траты ---- */
+function fillCats(){
+  const opts=S.cats.map(c=>`<option>${esc(c)}</option>`).join('');
+  const cur=$('fCat').value;$('fCat').innerHTML=opts;if(S.cats.includes(cur))$('fCat').value=cur;
+  const hc=$('hCat').value;$('hCat').innerHTML='<option value="">Все</option>'+opts;$('hCat').value=hc;
+}
+function fillMonths(){
+  const set=new Set(S.exp.map(e=>e.date.slice(0,7)));set.add(today().slice(0,7));
+  const arr=[...set].sort().reverse();const cur=$('hMonth').value;
+  $('hMonth').innerHTML='<option value="">Все</option>'+arr.map(k=>{const [y,m]=k.split('-');return`<option value="${k}">${MON[m-1]} ${y}</option>`}).join('');
+  $('hMonth').value=arr.includes(cur)?cur:(cur===''?'':today().slice(0,7));
+}
+function renderHist(){
+  const m=$('hMonth').value,c=$('hCat').value;
+  const items=S.exp.filter(e=>(!m||e.date.startsWith(m))&&(!c||e.cat===c)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  $('hBody').innerHTML=items.map(e=>`<tr><td>${showD(e.date)}</td><td>${esc(e.cat)}</td><td>${esc(e.note||'')}</td><td class="n">${money(e.amount)}</td><td class="n"><button class="mini" data-e="${e.id}">✎</button><button class="del" data-d="${e.id}">✕</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">Пока пусто</td></tr>';
+  $('hTotal').textContent=items.length?`Записей: ${items.length}, на сумму ${money(sum(items))}`:'';
+  $('hBody').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>startEdit(+b.dataset.e));
+  $('hBody').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{if(confirm('Удалить трату?')){S.exp=S.exp.filter(e=>e.id!==+b.dataset.d);save();renderAll()}});
+}
+function startEdit(id){
+  const e=S.exp.find(x=>x.id===id);if(!e)return;editId=id;
+  $('fDate').value=e.date;$('fAmount').value=e.amount;$('fCat').value=e.cat;$('fNote').value=e.note||'';
+  $('formTitle').textContent='Редактировать трату';$('fSubmit').textContent='Сохранить';$('fCancel').classList.remove('hide');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function resetForm(){editId=null;$('expForm').reset();$('fDate').value=today();$('formTitle').textContent='Добавить трату';$('fSubmit').textContent='Добавить';$('fCancel').classList.add('hide')}
+$('fCancel').onclick=resetForm;
+$('expForm').onsubmit=ev=>{
+  ev.preventDefault();
+  const rec={date:$('fDate').value,amount:parseFloat($('fAmount').value),cat:$('fCat').value,note:$('fNote').value.trim()};
+  if(!rec.date||!(rec.amount>=0))return;
+  if(editId){Object.assign(S.exp.find(x=>x.id===editId),rec)}else{S.exp.push({id:Date.now()+Math.floor(Math.random()*1000),...rec})}
+  const keepDate=rec.date;save();resetForm();$('fDate').value=keepDate;renderAll();
+};
+$('hMonth').onchange=$('hCat').onchange=renderHist;
+
+/* ---- импорт списком ---- */
+function parseDate(t){
+  let m;
+  if(m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))return`${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  if(m=t.match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$/)){let y=m[3]?+m[3]:new Date().getFullYear();if(y<100)y+=2000;return`${y}-${pad(m[2])}-${pad(m[1])}`}
+  return null;
+}
+$('bulkBtn').onclick=()=>{
+  const lines=$('bulk').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  let ok=0;const bad=[];
+  lines.forEach(l=>{
+    const p=l.split(/\s+/);const d=parseDate(p[0]);const a=parseFloat((p[1]||'').replace(',','.'));
+    if(!d||isNaN(parse(d))||isNaN(a)){bad.push(l);return}
+    let cat=p[2]||'Прочее';
+    const found=S.cats.find(c=>c.toLowerCase()===cat.toLowerCase());
+    if(found)cat=found;else S.cats.push(cat=cat[0].toUpperCase()+cat.slice(1));
+    S.exp.push({id:Date.now()+Math.floor(Math.random()*1e6),date:d,amount:a,cat,note:p.slice(3).join(' ')});ok++;
+  });
+  save();$('bulk').value=bad.join('\n');
+  $('bulkMsg').textContent=`Добавлено: ${ok}`+(bad.length?`, не распознано: ${bad.length} (оставлены в поле)`:'');
+  renderAll();
+};
+
+/* ---- отчёт ---- */
+function renderReport(){
+  const ws=weeksList().reverse();
+  const sel=$('rWeek').value;
+  $('rWeek').innerHTML=ws.map(m=>`<option value="${m}">${weekLabel(m)}${m===mondayOf(today())?' (текущая)':''}</option>`).join('');
+  $('rWeek').value=ws.includes(sel)?sel:ws[0];
+  buildReport($('rWeek').value);
+  renderWeeks();
+}
+function buildReport(m){
+  const w=weekInfo(m);const {settings:st}=S;
+  const isCur=m===mondayOf(today());
+  const doneAll=weeksList().filter(x=>x<=m).map(weekInfo);
+  const saved=doneAll.reduce((s,x)=>s+x.diff,0);
+  const totalSpentToEnd=sum(S.exp.filter(e=>e.date<=w.end));
+  const leftTotal=st.total-totalSpentToEnd;
+  const over=w.diff<0;
+  const byDay=DAYS.map((n,i)=>{const d=addDays(m,i);return{n,v:sum(w.items.filter(e=>e.date===d))}});
+  const maxD=Math.max(1,...byDay.map(x=>x.v));
+  const prev=weekInfo(addDays(m,-7));
+  $('report').innerHTML=`<div class="card">
+    <h2>Отчёт за неделю ${weekLabel(m)} ${isCur?'<span class="muted" style="font-weight:400">— неделя ещё идёт</span>':''}</h2>
+    <p style="font-size:18px;margin:4px 0 14px">${over?`<span class="badge bad">Вышли за лимит</span> перерасход <b class="bad">${money(-w.diff)}</b>`:`<span class="badge ok">В пределах лимита</span> сэкономили <b class="ok">${money(w.diff)}</b>`}</p>
+    <div class="grid">
+      <div class="stat"><div class="l">Лимит недели</div><div class="v">${money(w.limit)}</div></div>
+      <div class="stat"><div class="l">Потрачено за неделю</div><div class="v">${money(w.spent)}</div></div>
+      <div class="stat"><div class="l">${over?'Перерасход':'Сэкономлено'}</div><div class="v ${over?'bad':'ok'}">${money(Math.abs(w.diff))}</div></div>
+      <div class="stat"><div class="l">Осталось от общих денег</div><div class="v ${leftTotal<0?'bad':''}">${money(leftTotal)}</div></div>
+    </div>
+    <div class="bar ${over?'over':''}"><i style="width:${w.limit?Math.min(100,w.spent/w.limit*100):0}%"></i></div>
+    <div class="muted" style="font-size:13px;margin-top:4px">${w.limit?Math.round(w.spent/w.limit*100):0}% лимита</div>
+    <div class="grid" style="margin-top:12px">
+      <div class="stat"><div class="l">Накоплено экономии за все недели до этой включительно</div><div class="v ${saved<0?'bad':'ok'}">${money(saved)}</div></div>
+      <div class="stat"><div class="l">Всего денег / потрачено к концу недели</div><div class="v" style="font-size:16px">${money(st.total)} / ${money(totalSpentToEnd)}</div></div>
+      <div class="stat"><div class="l">К прошлой неделе</div><div class="v" style="font-size:16px">${prev.items.length?((w.spent-prev.spent>0?'+':'')+money(w.spent-prev.spent)):'нет данных'}</div></div>
+    </div>
+  </div>
+  <div class="card"><h2>По категориям</h2>${catBars(w.items)}</div>
+  <div class="card"><h2>По дням</h2>${byDay.map(x=>`<div class="cat-row"><span>${x.n}</span><div class="bar"><i style="width:${x.v/maxD*100}%"></i></div><span style="text-align:right">${money(x.v)}</span></div>`).join('')}</div>
+  <div class="card"><h2>Все траты недели</h2><div class="tablewrap"><table><tbody>${w.items.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>`<tr><td>${showD(e.date)}</td><td>${esc(e.cat)}</td><td>${esc(e.note||'')}</td><td class="n">${money(e.amount)}</td></tr>`).join('')||'<tr><td class="muted">Трат нет</td></tr>'}</tbody></table></div></div>`;
+}
+function renderWeeks(){
+  $('weeksBody').innerHTML=weeksList().reverse().map(m=>{
+    const w=weekInfo(m),cur=m===mondayOf(today());
+    return`<tr><td>${weekLabel(m)}${cur?' <span class="muted">(идёт)</span>':''}</td><td class="n">${money(w.spent)}</td><td class="n">${money(w.limit)}</td><td class="n ${w.diff<0?'bad':'ok'}">${w.diff<0?'−':'+'}${money(Math.abs(w.diff))}</td><td>${w.diff<0?'<span class="badge bad">перерасход</span>':'<span class="badge ok">в лимите</span>'}</td></tr>`}).join('');
+}
+$('rBtn').onclick=()=>buildReport($('rWeek').value);
+$('rWeek').onchange=()=>buildReport($('rWeek').value);
+$('rPrint').onclick=()=>window.print();
+
+/* ---- настройки ---- */
+function renderSettings(){
+  $('sTotal').value=S.settings.total||'';$('sLimit').value=S.settings.weekLimit||'';$('sCur').value=S.settings.cur;
+  $('catList').innerHTML=S.cats.map((c,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:4px 0"><span>${esc(c)}</span><span><button class="mini" data-r="${i}">Переименовать</button><button class="del" data-x="${i}">✕</button></span></div>`).join('');
+  $('catList').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{
+    const c=S.cats[+b.dataset.x];const n=S.exp.filter(e=>e.cat===c).length;
+    if(n&&!confirm(`В категории «${c}» ${n} трат — они останутся с этим названием. Удалить категорию из списка?`))return;
+    S.cats.splice(+b.dataset.x,1);save();renderAll()});
+  $('catList').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.r,old=S.cats[i],nn=(prompt('Новое название',old)||'').trim();
+    if(!nn||nn===old)return;S.exp.forEach(e=>{if(e.cat===old)e.cat=nn});S.cats[i]=nn;save();renderAll()});
+}
+$('sSave').onclick=()=>{S.settings.total=parseFloat($('sTotal').value)||0;S.settings.weekLimit=parseFloat($('sLimit').value)||0;S.settings.cur=$('sCur').value.trim()||'₽';save();renderAll();alert('Сохранено')};
+$('addCat').onclick=()=>{const c=$('newCat').value.trim();if(c&&!S.cats.includes(c)){S.cats.push(c);save();$('newCat').value='';renderAll()}};
+$('exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='budget-'+today()+'.json';a.click()};
+$('impBtn').onclick=()=>$('impFile').click();
+$('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.settings||!d.exp)throw 0;if(confirm('Заменить текущие данные данными из файла?')){S=d;save();renderAll()}}catch(x){alert('Неверный файл')}};r.readAsText(f)};
+
+function renderAll(){fillCats();fillMonths();renderHome();renderHist();renderSettings();if(!$('t-rep').classList.contains('hide'))renderReport()}
+$('fDate').value=today();
+renderAll();
+if(!S.settings.total&&!S.settings.weekLimit)tab('set');
+</script>
+</body>
+</html>
