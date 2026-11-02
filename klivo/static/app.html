@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Klivo</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #12131A;
+    --surface: #1B1D27;
+    --surface-2: #23252F;
+    --surface-3: #2A2C38;
+    --border: #2C2E3A;
+    --text: #EDEEF2;
+    --text-muted: #8A8D9C;
+    --text-faint: #5C5F6E;
+    --accent: #00C2B8;
+    --accent-soft: rgba(0,194,184,0.14);
+    --urgent: #FF6B5E;
+    --urgent-soft: rgba(255,107,94,0.14);
+    --warn: #FFB454;
+    --warn-soft: rgba(255,180,84,0.14);
+    --good: #5FD68A;
+    --good-soft: rgba(95,214,138,0.14);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    height: 100%;
+  }
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 90px;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 16px 14px;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .radar-icon { width: 30px; height: 30px; position: relative; flex-shrink: 0; }
+  .radar-icon svg { width: 100%; height: 100%; }
+  .radar-sweep {
+    transform-origin: 15px 15px;
+    animation: sweep 3s linear infinite;
+  }
+  @keyframes sweep { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+  .brand-name { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
+  .brand-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .add-btn {
+    width: 36px; height: 36px; border-radius: 11px;
+    background: var(--accent-soft); color: var(--accent);
+    border: none; font-size: 20px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .add-btn:active { transform: scale(0.93); }
+
+  /* ---------- Tabs ---------- */
+  .tabs {
+    display: flex; gap: 6px;
+    padding: 12px 16px 0;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 9px 6px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .tab.active { background: var(--surface-2); color: var(--text); border-color: var(--surface-3); }
+  .tab .count {
+    background: var(--urgent);
+    color: #12131A;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 20px;
+    min-width: 16px;
+  }
+
+  main { flex: 1; padding: 14px 16px 0; }
+
+  /* ---------- Client Card ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: border-color .15s ease;
+  }
+  .card-main {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 14px;
+    cursor: pointer;
+  }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; color: #12131A;
+    flex-shrink: 0; position: relative;
+  }
+  .avatar .pulse {
+    position: absolute; inset: -4px;
+    border-radius: 14px;
+    border: 2px solid var(--urgent);
+    animation: pulse 1.8s ease-out infinite;
+  }
+  @keyframes pulse {
+    0% { opacity: 0.9; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.25); }
+  }
+  .card-info { flex: 1; min-width: 0; }
+  .card-name { font-size: 15px; font-weight: 600; }
+  .card-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .status-pill {
+    font-size: 11px; font-weight: 700;
+    padding: 4px 9px; border-radius: 20px;
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .status-overdue { background: var(--urgent-soft); color: var(--urgent); }
+  .status-today { background: var(--urgent-soft); color: var(--urgent); }
+  .status-soon { background: var(--warn-soft); color: var(--warn); }
+  .status-later { background: var(--surface-2); color: var(--text-faint); }
+  .status-done { background: var(--good-soft); color: var(--good); }
+
+  .card-expand {
+    padding: 0 14px 14px;
+    display: none;
+  }
+  .card.open .card-expand { display: block; }
+  .draft-box {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 12px;
+    font-size: 13.5px;
+    line-height: 1.45;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .row-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    border: none; border-radius: 9px;
+    padding: 9px 12px; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; flex: 1; text-align: center;
+    min-width: 100px;
+  }
+  .btn-copy { background: var(--accent-soft); color: var(--accent); }
+  .btn-visited { background: var(--good-soft); color: var(--good); }
+  .btn-snooze { background: var(--surface-3); color: var(--text-muted); }
+  .btn-icon {
+    background: var(--surface-3); color: var(--text-muted);
+    flex: 0 0 auto; width: 36px; padding: 0;
+  }
+  .btn:active { filter: brightness(1.15); }
+
+  .empty {
+    text-align: center; padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .empty-emoji { font-size: 34px; margin-bottom: 10px; }
+  .empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .empty-sub { font-size: 13px; line-height: 1.5; }
+
+  /* ---------- Calendar ---------- */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-title { font-size: 15px; font-weight: 700; }
+  .cal-nav { display: flex; gap: 6px; }
+  .cal-nav button {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--surface-2); border: none; color: var(--text);
+    font-size: 14px; cursor: pointer;
+  }
+  .cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 5px; margin-bottom: 16px;
+  }
+  .cal-dow { text-align: center; font-size: 10.5px; color: var(--text-faint); padding-bottom: 4px; font-weight: 600; }
+  .cal-day {
+    aspect-ratio: 1; border-radius: 9px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 12.5px; color: var(--text-muted); cursor: pointer; gap: 2px;
+    position: relative;
+  }
+  .cal-day.empty-cell { background: transparent; border-color: transparent; cursor: default; }
+  .cal-day.today { border-color: var(--accent); color: var(--text); }
+  .cal-day.selected { background: var(--surface-3); color: var(--text); }
+  .cal-dot { width: 5px; height: 5px; border-radius: 50%; position: absolute; bottom: 5px; }
+  .cal-day-list-title { font-size: 12px; color: var(--text-muted); margin: 4px 0 8px; font-weight: 600; }
+
+  /* ---------- Modal ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: none; align-items: flex-end; justify-content: center; z-index: 50;
+  }
+  .overlay.show { display: flex; }
+  .sheet {
+    background: var(--surface);
+    width: 100%; max-width: 480px;
+    border-radius: 18px 18px 0 0;
+    padding: 18px 18px 26px;
+    max-height: 88vh; overflow-y: auto;
+  }
+  .sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .field { margin-bottom: 14px; }
+  .field label { font-size: 12px; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 6px; }
+  .field input[type="text"], .field input[type="date"], .field input[type="number"], .field textarea {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 11px 12px; color: var(--text); font-size: 14px;
+    font-family: inherit;
+  }
+  .field textarea { resize: vertical; min-height: 50px; }
+  .seg { display: flex; gap: 6px; }
+  .seg button {
+    flex: 1; padding: 10px 6px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .seg button.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .freq-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chip {
+    padding: 7px 12px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .chip.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .sheet-actions { display: flex; gap: 8px; margin-top: 6px; }
+  .btn-primary { background: var(--accent); color: #0A0B0F; flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .btn-secondary { background: var(--surface-2); color: var(--text-muted); flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .btn-danger-text { color: var(--urgent); font-size: 12.5px; font-weight: 600; background: none; border: none; cursor: pointer; padding: 6px 0; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--surface-3); color: var(--text); padding: 10px 18px;
+    border-radius: 30px; font-size: 13px; font-weight: 600; z-index: 100;
+    opacity: 0; transition: opacity .2s ease; pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .toast.show { opacity: 1; }
+
+  @media (min-width: 900px) { #app { max-width: 640px; } .sheet { border-radius: 18px; margin-bottom: 4vh; } .overlay { align-items: center; } }
+  .login { max-width: 360px; margin: 0 auto; min-height: 100vh; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 14px; }
+  .login.show { display: flex; }
+  .login h1 { font-size: 26px; letter-spacing: -0.4px; }
+  .login p { color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+  .login .btn-primary { flex: none; width: 100%; }
+  .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <div class="radar-icon" style="width:64px;height:64px">
+    <svg viewBox="0 0 30 30">
+      <circle cx="15" cy="15" r="13" fill="none" stroke="#2C2E3A" stroke-width="1.5"/>
+      <circle cx="15" cy="15" r="8.5" fill="none" stroke="#2C2E3A" stroke-width="1.5"/>
+      <circle cx="15" cy="15" r="4" fill="none" stroke="#2C2E3A" stroke-width="1.5"/>
+      <g class="radar-sweep"><path d="M15 15 L15 2 A13 13 0 0 1 25.2 7.8 Z" fill="#00C2B8" opacity="0.35"/></g>
+      <circle cx="15" cy="15" r="1.8" fill="#00C2B8"/>
+    </svg>
+  </div>
+  <h1>Klivo</h1>
+  <p>Кого не забыть сегодня. Напоминания клиентам о повторной записи и уходе после процедуры. Один аккаунт на сайте и в Telegram.</p>
+  <div id="loginBtns"></div>
+  <p id="loginMsg" style="font-size:12px"></p>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <div class="brand">
+      <div class="radar-icon">
+        <svg viewBox="0 0 30 30">
+          <circle cx="15" cy="15" r="13" fill="none" stroke="#2C2E3A" stroke-width="1.5"/>
+          <circle cx="15" cy="15" r="8.5" fill="none" stroke="#2C2E3A" stroke-width="1.5"/>
+          <circle cx="15" cy="15" r="4" fill="none" stroke="#2C2E3A" stroke-width="1.5"/>
+          <g class="radar-sweep">
+            <path d="M15 15 L15 2 A13 13 0 0 1 25.2 7.8 Z" fill="#00C2B8" opacity="0.35"/>
+          </g>
+          <circle cx="15" cy="15" r="1.8" fill="#00C2B8"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">Klivo</div>
+        <div class="brand-sub">кого не забыть сегодня</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="add-btn" id="logoutBtn" title="Выйти" style="font-size:14px;background:var(--surface-2);color:var(--text-muted)">⎋</button>
+      <button class="add-btn" id="addBtn">+</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="today">Сегодня <span class="count" id="countToday" style="display:none">0</span></button>
+    <button class="tab" data-tab="all">Все клиенты</button>
+    <button class="tab" data-tab="calendar">Календарь</button>
+  </div>
+
+  <main id="main">
+    <div class="loading">Загружаю...</div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <div class="sheet-title" id="sheetTitle">Новый клиент</div>
+    <input type="hidden" id="editId">
+    <div class="field">
+      <label>Имя / ник клиента</label>
+      <input type="text" id="fNickname" placeholder="Аня">
+    </div>
+    <div class="field">
+      <label>Тип напоминания</label>
+      <div class="seg">
+        <button type="button" id="segReturn" class="active" data-type="return">Обычное (запись снова)</button>
+        <button type="button" id="segAftercare" data-type="aftercare">Уход после тату</button>
+      </div>
+    </div>
+    <div class="field" id="freqField">
+      <label>Как часто должен возвращаться</label>
+      <div class="freq-chips">
+        <div class="chip" data-days="21">3 недели</div>
+        <div class="chip" data-days="30">1 месяц</div>
+        <div class="chip" data-days="60">2 месяца</div>
+        <div class="chip" data-days="90">3 месяца</div>
+        <div class="chip" data-days="180">6 месяцев</div>
+      </div>
+      <input type="number" id="fFreqCustom" placeholder="Или своё число дней">
+    </div>
+    <div class="field">
+      <label>Дата последнего визита</label>
+      <input type="date" id="fLastVisit">
+    </div>
+    <div class="field">
+      <label>Заметка (необязательно)</label>
+      <textarea id="fNotes" placeholder="Услуга, вкусы, пожелания..."></textarea>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-secondary" id="cancelBtn">Отмена</button>
+      <button class="btn-primary" id="saveBtn">Сохранить</button>
+    </div>
+    <div style="text-align:center; margin-top:10px;">
+      <button class="btn-danger-text" id="deleteBtn" style="display:none;">Удалить клиента</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var STORAGE_KEY = 'radar-clients';
+  var clients = [];
+  var activeTab = 'today';
+  var calDate = new Date();
+  var selectedCalDay = null;
+  var currentSegType = 'return';
+  var currentFreq = 21;
+
+  var AVATAR_COLORS = ['#00C2B8','#FF6B5E','#FFB454','#7C9CFF','#C77DFF','#5FD68A'];
+
+  function todayISO(){
+    var d = new Date();
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }
+  function pad(n){ return n<10 ? '0'+n : ''+n; }
+  function parseISO(s){
+    var p = s.split('-');
+    return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+  }
+  function toISO(d){
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }
+  function addDays(iso, n){
+    var d = parseISO(iso);
+    d.setDate(d.getDate()+n);
+    return toISO(d);
+  }
+  function diffDays(a,b){
+    var da = parseISO(a), db = parseISO(b);
+    return Math.round((da-db)/86400000);
+  }
+  function fmtDate(iso){
+    var d = parseISO(iso);
+    return d.toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
+  }
+  function pluralDays(n){
+    var abs = Math.abs(n)%100;
+    var n1 = abs%10;
+    if (abs>10 && abs<20) return 'дней';
+    if (n1===1) return 'день';
+    if (n1>=2 && n1<=4) return 'дня';
+    return 'дней';
+  }
+  function initials(name){
+    return (name||'?').trim().slice(0,1).toUpperCase();
+  }
+  function colorFor(id){
+    var sum = 0;
+    for (var i=0;i<id.length;i++) sum += id.charCodeAt(i);
+    return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+  }
+
+  var AFTERCARE_STAGES = [1,5,10];
+  var AFTERCARE_TEXTS = [
+    function(n){ return 'Привет, '+n+'! Прошли сутки после тату — как самочувствие? Небольшое покраснение и жжение — это нормально. Главное: не сдирай корочку и держи подальше от солнца 🙂'; },
+    function(n){ return n+', привет! Уже 5 дней — как заживает тату? Если чешется или появились вопросы по уходу — пиши, подскажу.'; },
+    function(n){ return n+', привет! 10 дней прошло — тату почти зажила 🎉 Если останутся бледные места, через месяц можем бесплатно подправить. Скинь фото, если хочешь — гляну.'; }
+  ];
+
+  function getDueInfo(c, today){
+    if (c.type === 'aftercare'){
+      if (c.aftercareStage >= 3){
+        return { status:'done', label:'цикл завершён', dueDate:null, diff:null };
+      }
+      var due = addDays(c.lastVisitDate, AFTERCARE_STAGES[c.aftercareStage]);
+      return statusFromDiff(diffDays(due, today), due);
+    } else {
+      var snoozeUntil = c.snoozeUntil;
+      var due = addDays(c.lastVisitDate, c.frequencyDays);
+      if (snoozeUntil && diffDays(snoozeUntil, today) >= 0 && diffDays(snoozeUntil, due) > 0){
+        due = snoozeUntil;
+      }
+      return statusFromDiff(diffDays(due, today), due);
+    }
+  }
+  function statusFromDiff(diff, due){
+    if (diff < 0) return { status:'overdue', label:'просрочено на '+Math.abs(diff)+' '+pluralDays(diff), dueDate:due, diff:diff };
+    if (diff === 0) return { status:'today', label:'сегодня', dueDate:due, diff:diff };
+    if (diff <= 3) return { status:'soon', label:'через '+diff+' '+pluralDays(diff), dueDate:due, diff:diff };
+    return { status:'later', label:fmtDate(due), dueDate:due, diff:diff };
+  }
+
+  function generateMessage(c){
+    var today = todayISO();
+    if (c.type === 'aftercare'){
+      var stage = Math.min(c.aftercareStage, 2);
+      return AFTERCARE_TEXTS[stage](c.nickname);
+    } else {
+      var daysAgo = diffDays(today, c.lastVisitDate);
+      var svc = c.notes ? c.notes.split(',')[0].trim() : 'услугу';
+      return 'Привет, '+c.nickname+'! Ты был(-а) у нас '+daysAgo+' '+pluralDays(daysAgo)+' назад — самое время обновить '+(svc||'запись')+'. Есть окошки на этой неделе, будет удобно?';
+    }
+  }
+
+  function statusRank(s){
+    return { overdue:0, today:1, soon:2, later:3, done:4 }[s];
+  }
+
+  function sortedClients(list){
+    var today = todayISO();
+    return list.slice().map(function(c){
+      c._info = getDueInfo(c, today);
+      return c;
+    }).sort(function(a,b){
+      var ra = statusRank(a._info.status), rb = statusRank(b._info.status);
+      if (ra !== rb) return ra - rb;
+      return (a._info.diff||0) - (b._info.diff||0);
+    });
+  }
+
+  /* ---------- Хранилище: сервер (общее для сайта и Telegram) ---------- */
+  var snapshot = {};   // id -> JSON последнего сохранённого состояния
+  var saving = Promise.resolve();
+
+  function api(method, url, body){
+    return fetch(url, {
+      method: method, credentials: 'same-origin',
+      headers: body ? {'Content-Type':'application/json'} : {},
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function(r){
+      if (r.status === 401){ showLogin(); throw new Error('auth'); }
+      if (!r.ok) throw new Error('http '+r.status);
+      return r.json();
+    });
+  }
+
+  async function loadData(){
+    try {
+      clients = await api('GET', '/api/clients');
+      snapshot = {};
+      clients.forEach(function(c){ snapshot[c.id] = JSON.stringify(strip(c)); });
+    } catch(e){
+      if (e.message !== 'auth') showToast('Не удалось загрузить');
+      return;
+    }
+    render();
+  }
+  function strip(c){
+    var o = {}; for (var k in c) if (k.charAt(0) !== '_') o[k] = c[k]; return o;
+  }
+  // Отправляет на сервер только изменённых и удалённых клиентов
+  function saveData(){
+    saving = saving.then(async function(){
+      try {
+        var ids = {};
+        for (var i=0;i<clients.length;i++){
+          var c = strip(clients[i]), js = JSON.stringify(c);
+          ids[c.id] = 1;
+          if (snapshot[c.id] !== js){
+            await api('PUT', '/api/clients/'+encodeURIComponent(c.id), c);
+            snapshot[c.id] = js;
+          }
+        }
+        for (var id in snapshot){
+          if (!ids[id]){ await api('DELETE', '/api/clients/'+encodeURIComponent(id)); delete snapshot[id]; }
+        }
+      } catch(e){
+        if (e.message !== 'auth') showToast('Не удалось сохранить :(');
+      }
+    });
+    return saving;
+  }
+
+  /* ---------- Вход ---------- */
+  function showLogin(){
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('login').classList.add('show');
+  }
+  function showApp(){
+    document.getElementById('login').classList.remove('show');
+    document.getElementById('app').style.display = '';
+    loadData();
+  }
+  async function initAuth(){
+    var tg = window.Telegram && Telegram.WebApp;
+    // Открыто внутри Telegram: входим по подписанным данным мини-аппа
+    if (tg && tg.initData){
+      try { tg.ready(); tg.expand(); } catch(e){}
+      try {
+        await fetch('/api/auth/webapp', {method:'POST', credentials:'same-origin',
+          headers:{'Content-Type':'application/json'}, body: JSON.stringify({initData: tg.initData})})
+          .then(function(r){ if(!r.ok) throw 0; });
+        return showApp();
+      } catch(e){}
+    }
+    // Уже есть сессия на сайте?
+    try { await api('GET','/api/me'); return showApp(); } catch(e){}
+    // Показываем кнопки входа
+    var cfg = await fetch('/api/config').then(function(r){ return r.json(); }).catch(function(){ return {}; });
+    var box = document.getElementById('loginBtns');
+    if (cfg.bot){
+      var w = document.createElement('script');
+      w.async = true;
+      w.src = 'https://telegram.org/js/telegram-widget.js?22';
+      w.setAttribute('data-telegram-login', cfg.bot);
+      w.setAttribute('data-size', 'large');
+      w.setAttribute('data-radius', '10');
+      w.setAttribute('data-auth-url', '/auth/telegram');
+      w.setAttribute('data-request-access', 'write');
+      box.appendChild(w);
+    } else if (!cfg.dev){
+      document.getElementById('loginMsg').textContent = 'Вход через Telegram ещё не настроен на сервере.';
+    }
+    if (cfg.dev){
+      var b = document.createElement('button');
+      b.className = 'btn-primary'; b.textContent = 'Войти как тестовый';
+      b.onclick = function(){ fetch('/api/auth/dev',{method:'POST',credentials:'same-origin'}).then(showApp); };
+      box.appendChild(b);
+    }
+  }
+  document.getElementById('logoutBtn').addEventListener('click', function(){
+    fetch('/api/logout',{method:'POST',credentials:'same-origin'}).then(function(){ clients=[]; showLogin(); });
+  });
+  // Зеркало: вернулись на вкладку или открыли Telegram — подтягиваем свежие данные
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden && document.getElementById('app').style.display !== 'none'){
+      saving.then(loadData);
+    }
+  });
+
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 1800);
+  }
+
+  /* ---------- Rendering ---------- */
+  function render(){
+    var main = document.getElementById('main');
+    var today = todayISO();
+    var sorted = sortedClients(clients);
+
+    var overdueTodayCount = sorted.filter(function(c){ return c._info.status==='overdue' || c._info.status==='today'; }).length;
+    var badge = document.getElementById('countToday');
+    if (overdueTodayCount>0){ badge.style.display='inline-block'; badge.textContent = overdueTodayCount; }
+    else badge.style.display='none';
+
+    if (activeTab === 'calendar'){ renderCalendar(main); return; }
+
+    var list = activeTab === 'today'
+      ? sorted.filter(function(c){ return c._info.status==='overdue' || c._info.status==='today' || c._info.status==='soon'; })
+      : sorted;
+
+    if (clients.length === 0){
+      main.innerHTML = emptyHTML('Пока пусто', 'Добавь первого клиента кнопкой «+» вверху — впиши имя, дату последнего визита и как часто он должен возвращаться.');
+      return;
+    }
+    if (list.length === 0){
+      main.innerHTML = emptyHTML('Сегодня писать некому', 'Все клиенты в порядке. Загляни во вкладку «Все клиенты», чтобы посмотреть на всех.');
+      return;
+    }
+
+    main.innerHTML = list.map(cardHTML).join('');
+    bindCardEvents();
+  }
+
+  function emptyHTML(title, sub){
+    return '<div class="empty"><div class="empty-emoji">📡</div><div class="empty-title">'+title+'</div><div class="empty-sub">'+sub+'</div></div>';
+  }
+
+  function cardHTML(c){
+    var info = c._info;
+    var pulse = (info.status==='overdue' || info.status==='today') ? '<span class="pulse"></span>' : '';
+    var metaLine = c.type==='aftercare'
+      ? 'уход после тату · этап '+Math.min(c.aftercareStage+1,3)+'/3'
+      : 'раз в '+c.frequencyDays+' дн.' + (c.notes ? ' · '+escapeHtml(c.notes.split(',')[0].trim()) : '');
+    var msg = escapeHtml(generateMessage(c));
+    var showActions = info.status !== 'done';
+    return (
+      '<div class="card" data-id="'+c.id+'">'+
+        '<div class="card-main" data-toggle="'+c.id+'">'+
+          '<div class="avatar" style="background:'+colorFor(c.id)+'">'+pulse+initials(c.nickname)+'</div>'+
+          '<div class="card-info">'+
+            '<div class="card-name">'+escapeHtml(c.nickname)+'</div>'+
+            '<div class="card-meta">'+metaLine+'</div>'+
+          '</div>'+
+          '<div class="status-pill status-'+info.status+'">'+info.label+'</div>'+
+        '</div>'+
+        '<div class="card-expand">'+
+          (showActions ? (
+            '<div class="draft-box">'+msg+'</div>'+
+            '<div class="row-btns">'+
+              '<button class="btn btn-copy" data-copy="'+c.id+'">Скопировать текст</button>'+
+              '<button class="btn btn-icon" data-edit="'+c.id+'">✎</button>'+
+            '</div>'+
+            '<div class="row-btns" style="margin-top:8px;">'+
+              (c.type==='aftercare'
+                ? '<button class="btn btn-visited" data-aftercare-next="'+c.id+'">Отправил(а) — след. этап</button>'
+                : '<button class="btn btn-visited" data-visited="'+c.id+'">Клиент вернулся</button>'+
+                  '<button class="btn btn-snooze" data-snooze="'+c.id+'">Написал(а), жду ответ</button>'
+              )+
+            '</div>'
+          ) : (
+            '<div class="draft-box" style="color:var(--text-muted)">Цикл ухода завершён. Можно отметить, что клиент вернулся — тогда он попадёт в обычные напоминания.</div>'+
+            '<div class="row-btns">'+
+              '<button class="btn btn-visited" data-visited="'+c.id+'">Клиент вернулся</button>'+
+              '<button class="btn btn-icon" data-edit="'+c.id+'">✎</button>'+
+            '</div>'
+          ))+
+        '</div>'+
+      '</div>'
+    );
+  }
+
+  function escapeHtml(s){
+    var d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  }
+
+  function bindCardEvents(){
+    document.querySelectorAll('[data-toggle]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var card = el.closest('.card');
+        card.classList.toggle('open');
+      });
+    });
+    document.querySelectorAll('[data-copy]').forEach(function(el){
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
+        var c = clients.find(function(x){ return x.id===el.dataset.copy; });
+        var text = generateMessage(c);
+        copyText(text);
+      });
+    });
+    document.querySelectorAll('[data-edit]').forEach(function(el){
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
+        openModal(clients.find(function(x){ return x.id===el.dataset.edit; }));
+      });
+    });
+    document.querySelectorAll('[data-visited]').forEach(function(el){
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
+        var c = clients.find(function(x){ return x.id===el.dataset.visited; });
+        c.lastVisitDate = todayISO();
+        c.aftercareStage = 0;
+        c.snoozeUntil = null;
+        saveData(); render();
+        showToast('Отмечено: '+c.nickname+' вернулся(-ась)');
+      });
+    });
+    document.querySelectorAll('[data-snooze]').forEach(function(el){
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
+        var c = clients.find(function(x){ return x.id===el.dataset.snooze; });
+        c.snoozeUntil = addDays(todayISO(), 7);
+        saveData(); render();
+        showToast('Напомню через 7 дней');
+      });
+    });
+    document.querySelectorAll('[data-aftercare-next]').forEach(function(el){
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
+        var c = clients.find(function(x){ return x.id===el.dataset.aftercareNext; });
+        c.aftercareStage = Math.min(c.aftercareStage+1, 3);
+        saveData(); render();
+        showToast('Отмечено отправленным');
+      });
+    });
+  }
+
+  function copyText(text){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){
+        showToast('Текст скопирован');
+      }).catch(function(){ fallbackCopy(text); });
+    } else {
+      fallbackCopy(text);
+    }
+  }
+  function fallbackCopy(text){
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showToast('Текст скопирован'); }
+    catch(e){ showToast('Не получилось скопировать'); }
+    document.body.removeChild(ta);
+  }
+
+  /* ---------- Calendar ---------- */
+  function renderCalendar(main){
+    var year = calDate.getFullYear(), month = calDate.getMonth();
+    var first = new Date(year, month, 1);
+    var startDow = (first.getDay()+6)%7; // Monday=0
+    var daysInMonth = new Date(year, month+1, 0).getDate();
+    var monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    var today = todayISO();
+
+    var dueMap = {};
+    clients.forEach(function(c){
+      var info = getDueInfo(c, today);
+      if (info.status !== 'done' && info.dueDate){
+        if (!dueMap[info.dueDate]) dueMap[info.dueDate] = [];
+        dueMap[info.dueDate].push({ client:c, info:info });
+      }
+    });
+
+    var html = '<div class="cal-head"><div class="cal-title">'+monthNames[month]+' '+year+'</div>'+
+      '<div class="cal-nav"><button id="prevMonth">‹</button><button id="nextMonth">›</button></div></div>';
+    html += '<div class="cal-grid">';
+    ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].forEach(function(d){ html += '<div class="cal-dow">'+d+'</div>'; });
+    for (var i=0;i<startDow;i++) html += '<div class="cal-day empty-cell"></div>';
+    for (var d=1; d<=daysInMonth; d++){
+      var iso = year+'-'+pad(month+1)+'-'+pad(d);
+      var isToday = iso===today;
+      var isSel = iso===selectedCalDay;
+      var entries = dueMap[iso];
+      var dotColor = '';
+      if (entries){
+        var worst = entries.reduce(function(acc,e){
+          var rank = statusRank(e.info.status);
+          return rank < acc ? rank : acc;
+        }, 99);
+        dotColor = worst===0 ? 'var(--urgent)' : worst===1 ? 'var(--urgent)' : worst===2 ? 'var(--warn)' : 'var(--text-faint)';
+      }
+      html += '<div class="cal-day'+(isToday?' today':'')+(isSel?' selected':'')+'" data-day="'+iso+'">'+d+
+        (entries ? '<span class="cal-dot" style="background:'+dotColor+'"></span>' : '')+
+        '</div>';
+    }
+    html += '</div>';
+
+    var dayToShow = selectedCalDay || today;
+    var dayEntries = dueMap[dayToShow] || [];
+    html += '<div class="cal-day-list-title">'+fmtDate(dayToShow)+(dayToShow===today?' · сегодня':'')+'</div>';
+    if (dayEntries.length===0){
+      html += emptyHTML('Никого не назначено', 'В этот день по расчёту ни с кем не нужно связываться.');
+    } else {
+      html += dayEntries.map(function(e){ return cardHTML(Object.assign({}, e.client, {_info:e.info})); }).join('');
+    }
+
+    main.innerHTML = html;
+    bindCardEvents();
+    document.getElementById('prevMonth').addEventListener('click', function(){ calDate.setMonth(calDate.getMonth()-1); render(); });
+    document.getElementById('nextMonth').addEventListener('click', function(){ calDate.setMonth(calDate.getMonth()+1); render(); });
+    document.querySelectorAll('.cal-day[data-day]').forEach(function(el){
+      el.addEventListener('click', function(){ selectedCalDay = el.dataset.day; render(); });
+    });
+  }
+
+  /* ---------- Modal ---------- */
+  function openModal(client){
+    document.getElementById('sheetTitle').textContent = client ? 'Редактировать клиента' : 'Новый клиент';
+    document.getElementById('editId').value = client ? client.id : '';
+    document.getElementById('fNickname').value = client ? client.nickname : '';
+    document.getElementById('fLastVisit').value = client ? client.lastVisitDate : todayISO();
+    document.getElementById('fNotes').value = client ? (client.notes||'') : '';
+    document.getElementById('deleteBtn').style.display = client ? 'inline-block' : 'none';
+
+    setSegType(client ? client.type : 'return');
+    currentFreq = client && client.frequencyDays ? client.frequencyDays : 21;
+    document.getElementById('fFreqCustom').value = '';
+    updateFreqChips();
+
+    document.getElementById('overlay').classList.add('show');
+  }
+  function closeModal(){
+    document.getElementById('overlay').classList.remove('show');
+  }
+  function setSegType(type){
+    currentSegType = type;
+    document.getElementById('segReturn').classList.toggle('active', type==='return');
+    document.getElementById('segAftercare').classList.toggle('active', type==='aftercare');
+    document.getElementById('freqField').style.display = type==='return' ? 'block' : 'none';
+  }
+  function updateFreqChips(){
+    document.querySelectorAll('.chip').forEach(function(ch){
+      ch.classList.toggle('active', parseInt(ch.dataset.days)===currentFreq);
+    });
+  }
+
+  document.getElementById('addBtn').addEventListener('click', function(){ openModal(null); });
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  document.getElementById('overlay').addEventListener('click', function(e){
+    if (e.target.id==='overlay') closeModal();
+  });
+  document.getElementById('segReturn').addEventListener('click', function(){ setSegType('return'); });
+  document.getElementById('segAftercare').addEventListener('click', function(){ setSegType('aftercare'); });
+  document.querySelectorAll('.chip').forEach(function(ch){
+    ch.addEventListener('click', function(){
+      currentFreq = parseInt(ch.dataset.days);
+      document.getElementById('fFreqCustom').value = '';
+      updateFreqChips();
+    });
+  });
+  document.getElementById('fFreqCustom').addEventListener('input', function(){
+    var v = parseInt(this.value);
+    if (v){ currentFreq = v; document.querySelectorAll('.chip').forEach(function(ch){ ch.classList.remove('active'); }); }
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', function(){
+    var nickname = document.getElementById('fNickname').value.trim();
+    if (!nickname){ showToast('Впиши имя клиента'); return; }
+    var lastVisit = document.getElementById('fLastVisit').value || todayISO();
+    var notes = document.getElementById('fNotes').value.trim();
+    var id = document.getElementById('editId').value;
+
+    if (id){
+      var c = clients.find(function(x){ return x.id===id; });
+      c.nickname = nickname;
+      c.type = currentSegType;
+      c.lastVisitDate = lastVisit;
+      c.notes = notes;
+      if (currentSegType==='return') c.frequencyDays = currentFreq;
+      if (currentSegType==='aftercare' && c.aftercareStage===undefined) c.aftercareStage = 0;
+    } else {
+      clients.push({
+        id: 'c'+Date.now()+Math.floor(Math.random()*1000),
+        nickname: nickname,
+        type: currentSegType,
+        lastVisitDate: lastVisit,
+        frequencyDays: currentSegType==='return' ? currentFreq : null,
+        aftercareStage: currentSegType==='aftercare' ? 0 : undefined,
+        notes: notes,
+        snoozeUntil: null
+      });
+    }
+    saveData();
+    closeModal();
+    render();
+    showToast('Сохранено');
+  });
+
+  document.getElementById('deleteBtn').addEventListener('click', function(){
+    var id = document.getElementById('editId').value;
+    clients = clients.filter(function(x){ return x.id!==id; });
+    saveData();
+    closeModal();
+    render();
+    showToast('Клиент удалён');
+  });
+
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
+      t.classList.add('active');
+      activeTab = t.dataset.tab;
+      selectedCalDay = null;
+      render();
+    });
+  });
+
+  initAuth();
+})();
+</script>
+</body>
+</html>
