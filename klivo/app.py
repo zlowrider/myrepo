@@ -77,6 +77,10 @@ def init_db():
       username TEXT NOT NULL DEFAULT '',
       created INTEGER NOT NULL,
       last_seen INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS leads(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL, name TEXT NOT NULL, contact TEXT NOT NULL,
+      message TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS clients(
       id TEXT NOT NULL,
       user_id INTEGER NOT NULL,
@@ -170,7 +174,7 @@ def auth_widget():
     if not tg:
         abort(403)
     _login(tg)
-    return redirect("/")
+    return redirect("/app")
 
 
 @app.post("/api/auth/dev")
@@ -198,7 +202,8 @@ def logout():
 
 
 # ---------- Клиенты ----------
-ALLOWED = {"id", "nickname", "type", "lastVisitDate", "frequencyDays", "aftercareStage", "notes", "snoozeUntil"}
+ALLOWED = {"id", "nickname", "type", "lastVisitDate", "frequencyDays", "aftercareStage", "notes", "snoozeUntil",
+           "check", "total", "visits"}
 
 
 def _clean(cid, d):
@@ -211,6 +216,11 @@ def _clean(cid, d):
         abort(400)
     out["type"] = "aftercare" if out.get("type") == "aftercare" else "return"
     out["notes"] = str(out.get("notes") or "")[:500]
+    for k, hi in (("check", 10_000_000), ("total", 1_000_000_000), ("visits", 100_000)):
+        try:
+            out[k] = max(0, min(hi, int(float(out.get(k) or 0))))
+        except (TypeError, ValueError):
+            out[k] = 0
     for k in ("lastVisitDate", "snoozeUntil"):
         v = out.get(k)
         out[k] = v if isinstance(v, str) and len(v) == 10 and v[4] == "-" and v[7] == "-" else None
@@ -262,12 +272,45 @@ def del_client(cid):
     return jsonify(ok=True)
 
 
+# ---------- Заявки с лендинга ----------
+_last_lead = {}
+
+
+@app.post("/api/lead")
+def lead():
+    d = request.get_json(silent=True) or {}
+    kind = d.get("kind") if d.get("kind") in ("course", "turnkey", "other") else "other"
+    name = str(d.get("name", "")).strip()[:80]
+    contact = str(d.get("contact", "")).strip()[:120]
+    message = str(d.get("message", "")).strip()[:1000]
+    if not name or len(contact) < 3 or not d.get("consent"):
+        abort(400)
+    ip = request.headers.get("X-Real-IP") or request.remote_addr
+    now = time.time()
+    if now - _last_lead.get(ip, 0) < 20:  # не чаще раза в 20 секунд с одного адреса
+        abort(429)
+    _last_lead[ip] = now
+    db().execute("INSERT INTO leads(kind,name,contact,message,created) VALUES(?,?,?,?,?)",
+                 (kind, name, contact, message, int(now)))
+    db().commit()
+    return jsonify(ok=True)
+
+
 # ---------- Страницы ----------
-@app.get("/")
-def index():
-    r = send_from_directory(HERE / "static", "app.html")
+def _page(name):
+    r = send_from_directory(HERE / "static", name)
     r.headers["Cache-Control"] = "no-cache"
     return r
+
+
+@app.get("/")
+def landing():
+    return _page("landing.html")
+
+
+@app.get("/app")
+def app_page():
+    return _page("app.html")
 
 
 @app.errorhandler(401)

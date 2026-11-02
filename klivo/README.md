@@ -20,8 +20,12 @@ nginx проксирует klivo.ru на 127.0.0.1:8080, сертификат ч
 
 ## Настройка бота в @BotFather
 1. `/setdomain` → выбрать бота → `klivo.ru` (нужно для кнопки входа на сайте).
-2. Menu Button (`/mybots` → Bot Settings → Menu Button) → URL `https://klivo.ru/`.
+2. Menu Button (`/mybots` → Bot Settings → Menu Button) → URL `https://klivo.ru/app`.
    Мини-апп открывает ту же страницу и входит автоматически по подписи Telegram.
+
+## Страницы
+- `/` — лендинг (`static/landing.html`), `/app` — приложение, заявки с лендинга пишутся в таблицу `leads` (sqlite).
+- Файлы для сервера: `deploy/` (systemd, nginx, пример .env).
 
 ## Устройство
 - `app.py` — Flask + SQLite; проверка подписи initData (Mini App) и Login Widget; API `/api/clients`.

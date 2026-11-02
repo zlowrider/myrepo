@@ -267,6 +267,12 @@
   .login h1 { font-size: 26px; letter-spacing: -0.4px; }
   .login p { color: var(--text-muted); font-size: 14px; line-height: 1.5; }
   .login .btn-primary { flex: none; width: 100%; }
+  .sum { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .sum-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+  .sum-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+  .sum-val { font-size: 20px; font-weight: 800; margin-top: 4px; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
+  .sum-val.good { color: var(--good); } .sum-val.bad { color: var(--urgent); }
+  .sum-sub { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
   .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
 </style>
 </head>
@@ -336,7 +342,7 @@
       <label>Тип напоминания</label>
       <div class="seg">
         <button type="button" id="segReturn" class="active" data-type="return">Обычное (запись снова)</button>
-        <button type="button" id="segAftercare" data-type="aftercare">Уход после тату</button>
+        <button type="button" id="segAftercare" data-type="aftercare">Уход после процедуры</button>
       </div>
     </div>
     <div class="field" id="freqField">
@@ -349,6 +355,10 @@
         <div class="chip" data-days="180">6 месяцев</div>
       </div>
       <input type="number" id="fFreqCustom" placeholder="Или своё число дней">
+    </div>
+    <div class="field">
+      <label>Средний чек, ₽ (сколько клиент платит за визит)</label>
+      <input type="number" id="fCheck" placeholder="3500" inputmode="numeric">
     </div>
     <div class="field">
       <label>Дата последнего визита</label>
@@ -407,6 +417,7 @@
     var d = parseISO(iso);
     return d.toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
   }
+  function money(n){ return Math.round(n||0).toLocaleString('ru-RU').replace(/\u00a0/g,' ')+' ₽'; }
   function pluralDays(n){
     var abs = Math.abs(n)%100;
     var n1 = abs%10;
@@ -426,9 +437,9 @@
 
   var AFTERCARE_STAGES = [1,5,10];
   var AFTERCARE_TEXTS = [
-    function(n){ return 'Привет, '+n+'! Прошли сутки после тату — как самочувствие? Небольшое покраснение и жжение — это нормально. Главное: не сдирай корочку и держи подальше от солнца 🙂'; },
-    function(n){ return n+', привет! Уже 5 дней — как заживает тату? Если чешется или появились вопросы по уходу — пиши, подскажу.'; },
-    function(n){ return n+', привет! 10 дней прошло — тату почти зажила 🎉 Если останутся бледные места, через месяц можем бесплатно подправить. Скинь фото, если хочешь — гляну.'; }
+    function(n){ return 'Привет, '+n+'! Прошли сутки после процедуры — как самочувствие? Небольшое покраснение или чувствительность — это нормально. Главное — следуй рекомендациям по уходу 🙂'; },
+    function(n){ return n+', привет! Уже 5 дней — как всё держится? Если появились вопросы по уходу — пиши, подскажу.'; },
+    function(n){ return n+', привет! 10 дней прошло 🎉 Как результат? Если захочешь что-то поправить или освежить — напиши, подберём время. Можешь скинуть фото, гляну.'; }
   ];
 
   function getDueInfo(c, today){
@@ -625,10 +636,22 @@
       return;
     }
 
-    main.innerHTML = list.map(cardHTML).join('');
+    main.innerHTML = summaryHTML(sorted) + list.map(cardHTML).join('');
     bindCardEvents();
   }
 
+  function summaryHTML(sorted){
+    var total = 0, risk = 0, riskN = 0;
+    sorted.forEach(function(c){
+      total += c.total || 0;
+      if ((c._info.status==='overdue') && c.check){ risk += c.check; riskN++; }
+    });
+    if (!total && !risk) return '';
+    return '<div class="sum">'+
+      '<div class="sum-tile"><div class="sum-label">Принесли клиенты</div><div class="sum-val good">'+money(total)+'</div><div class="sum-sub">за всё время</div></div>'+
+      '<div class="sum-tile"><div class="sum-label">Под угрозой</div><div class="sum-val '+(risk?'bad':'')+'">'+money(risk)+'</div><div class="sum-sub">'+(riskN? riskN+' клиент. давно не были':'все на связи')+'</div></div>'+
+      '</div>';
+  }
   function emptyHTML(title, sub){
     return '<div class="empty"><div class="empty-emoji">📡</div><div class="empty-title">'+title+'</div><div class="empty-sub">'+sub+'</div></div>';
   }
@@ -637,8 +660,9 @@
     var info = c._info;
     var pulse = (info.status==='overdue' || info.status==='today') ? '<span class="pulse"></span>' : '';
     var metaLine = c.type==='aftercare'
-      ? 'уход после тату · этап '+Math.min(c.aftercareStage+1,3)+'/3'
-      : 'раз в '+c.frequencyDays+' дн.' + (c.notes ? ' · '+escapeHtml(c.notes.split(',')[0].trim()) : '');
+      ? 'уход после процедуры · этап '+Math.min(c.aftercareStage+1,3)+'/3'
+      : 'раз в '+c.frequencyDays+' дн.' + (c.notes ? ' · '+escapeHtml(c.notes.split(',')[0].trim()) : '') +
+        (c.total ? ' · принесла '+money(c.total) : '');
     var msg = escapeHtml(generateMessage(c));
     var showActions = info.status !== 'done';
     return (
@@ -709,6 +733,8 @@
         e.stopPropagation();
         var c = clients.find(function(x){ return x.id===el.dataset.visited; });
         c.lastVisitDate = todayISO();
+        c.total = (c.total||0) + (c.check||0);
+        c.visits = (c.visits||0) + 1;
         c.aftercareStage = 0;
         c.snoozeUntil = null;
         saveData(); render();
@@ -820,6 +846,7 @@
     document.getElementById('fNickname').value = client ? client.nickname : '';
     document.getElementById('fLastVisit').value = client ? client.lastVisitDate : todayISO();
     document.getElementById('fNotes').value = client ? (client.notes||'') : '';
+    document.getElementById('fCheck').value = client && client.check ? client.check : '';
     document.getElementById('deleteBtn').style.display = client ? 'inline-block' : 'none';
 
     setSegType(client ? client.type : 'return');
@@ -868,6 +895,7 @@
     if (!nickname){ showToast('Впиши имя клиента'); return; }
     var lastVisit = document.getElementById('fLastVisit').value || todayISO();
     var notes = document.getElementById('fNotes').value.trim();
+    var check = parseInt(document.getElementById('fCheck').value) || 0;
     var id = document.getElementById('editId').value;
 
     if (id){
@@ -876,6 +904,7 @@
       c.type = currentSegType;
       c.lastVisitDate = lastVisit;
       c.notes = notes;
+      c.check = check;
       if (currentSegType==='return') c.frequencyDays = currentFreq;
       if (currentSegType==='aftercare' && c.aftercareStage===undefined) c.aftercareStage = 0;
     } else {
@@ -887,6 +916,9 @@
         frequencyDays: currentSegType==='return' ? currentFreq : null,
         aftercareStage: currentSegType==='aftercare' ? 0 : undefined,
         notes: notes,
+        check: check,
+        total: check,
+        visits: check ? 1 : 0,
         snoozeUntil: null
       });
     }

@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Klivo: клиентки возвращаются сами</title>
+<meta name="description" content="Klivo напоминает мастерам красоты, кому написать сегодня, подсказывает готовый текст и показывает, сколько денег приносит каждая клиентка. Работает в Telegram и на сайте.">
+<meta name="theme-color" content="#0a0b12">
+<meta property="og:title" content="Klivo: клиентки возвращаются сами">
+<meta property="og:description" content="Напоминания о повторной записи, готовые сообщения и деньги от клиенток на одном экране.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230a0b12' stroke='%2300c2b8' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%2300c2b8' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%2300c2b8'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0a0b12; --bg2:#0f1119; --surface:#151824; --surface2:#1b1f2e; --line:#252a3d;
+  --text:#eef0f7; --muted:#9097b0; --faint:#5f667f;
+  --acc:#00c2b8; --acc2:#8b7bff; --rose:#ff7eb6; --good:#5fd68a; --bad:#ff6b5e; --warn:#ffb454;
+  --grad:linear-gradient(120deg,#00c2b8 0%,#8b7bff 55%,#ff7eb6 100%);
+  --r:20px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow-x:hidden;color-scheme:dark}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* фон: сетка + свечение */
+.bg{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(600px 400px at 85% 8%,rgba(139,123,255,.18),transparent 70%),
+    radial-gradient(500px 380px at 8% 30%,rgba(0,194,184,.13),transparent 70%),
+    radial-gradient(500px 400px at 70% 80%,rgba(255,126,182,.09),transparent 70%),var(--bg)}
+.bg::after{content:"";position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+  background-size:48px 48px;mask-image:radial-gradient(ellipse 80% 60% at 50% 20%,#000 30%,transparent 80%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 20%,#000 30%,transparent 80%)}
+
+/* шапка */
+nav{position:sticky;top:0;z-index:30;background:rgba(10,11,18,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid rgba(37,42,61,.7)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.3px}
+.logo svg{width:28px;height:28px}
+.nav-links{display:flex;gap:26px;font-size:14px;color:var(--muted)}
+.nav-links a:hover{color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:14px;padding:13px 22px;font:600 15px/1 inherit;font-family:inherit;cursor:pointer;transition:transform .15s,box-shadow .2s,background .2s;min-height:48px}
+.btn:active{transform:scale(.97)}
+.btn-main{background:var(--grad);color:#07080d;box-shadow:0 8px 30px rgba(0,194,184,.25)}
+.btn-main:hover{box-shadow:0 10px 38px rgba(139,123,255,.4)}
+.btn-ghost{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line)}
+.btn-ghost:hover{background:rgba(255,255,255,.09)}
+.btn-sm{padding:9px 16px;min-height:38px;font-size:14px;border-radius:11px}
+
+/* hero */
+.hero{padding:56px 0 40px;overflow-x:clip}
+.hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--acc);background:rgba(0,194,184,.1);border:1px solid rgba(0,194,184,.25);padding:6px 12px;border-radius:30px;margin-bottom:20px}
+.eyebrow i{width:7px;height:7px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 0 var(--acc);animation:ping 2s infinite}
+@keyframes ping{70%{box-shadow:0 0 0 9px rgba(0,194,184,0)}100%{box-shadow:0 0 0 0 rgba(0,194,184,0)}}
+h1{font-size:clamp(34px,5.4vw,58px);line-height:1.04;letter-spacing:-1.5px;font-weight:800}
+.lead{font-size:clamp(16px,2vw,19px);color:var(--muted);margin:20px 0 28px;max-width:520px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.hero-note{margin-top:18px;font-size:13px;color:var(--faint);display:flex;gap:16px;flex-wrap:wrap}
+.hero-note span::before{content:"✓ ";color:var(--acc)}
+
+/* телефон */
+.stage{position:relative;display:flex;justify-content:center;padding:20px 0}
+.sweep{position:absolute;width:520px;height:520px;max-width:120vw;top:50%;left:50%;margin:-260px 0 0 -260px;border-radius:50%;
+  background:conic-gradient(from 0deg,rgba(0,194,184,.0) 0deg,rgba(0,194,184,.22) 50deg,rgba(0,194,184,0) 60deg);
+  animation:spin 6s linear infinite;mask-image:radial-gradient(circle,#000 30%,transparent 70%);-webkit-mask-image:radial-gradient(circle,#000 30%,transparent 70%)}
+.rings{position:absolute;width:520px;height:520px;max-width:120vw;top:50%;left:50%;margin:-260px 0 0 -260px;border-radius:50%;
+  background:repeating-radial-gradient(circle,transparent 0 58px,rgba(0,194,184,.12) 59px 60px);mask-image:radial-gradient(circle,#000 20%,transparent 70%);-webkit-mask-image:radial-gradient(circle,#000 20%,transparent 70%)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.phone{position:relative;z-index:1;width:292px;background:#0c0e17;border:1px solid #2b3150;border-radius:38px;padding:11px;box-shadow:0 40px 80px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.03) inset,0 0 60px rgba(139,123,255,.18);animation:float 7s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-10px)}}
+.screen{background:#12131a;border-radius:28px;padding:14px 12px 16px;overflow:hidden;position:relative}
+.screen::before{content:"";display:block;width:84px;height:20px;background:#0c0e17;border-radius:12px;margin:-14px auto 10px}
+.ph-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.ph-brand{display:flex;gap:8px;align-items:center;font-weight:700;font-size:14px}
+.ph-brand small{display:block;font-weight:400;font-size:9px;color:var(--muted)}
+.ph-plus{width:26px;height:26px;border-radius:9px;background:rgba(0,194,184,.15);color:var(--acc);display:grid;place-items:center;font-weight:700}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.tile{background:#1b1d27;border:1px solid #2c2e3a;border-radius:12px;padding:9px 10px}
+.tile small{font-size:9px;color:var(--muted);font-weight:600}
+.tile b{display:block;font-size:16px;margin-top:2px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.tile .g{color:var(--good)}.tile .r{color:var(--bad)}
+.chart-box{background:#1b1d27;border:1px solid #2c2e3a;border-radius:12px;padding:9px 10px 6px;margin-bottom:8px}
+.chart-box small{font-size:9px;color:var(--muted);font-weight:600;display:flex;justify-content:space-between}
+.chart-box svg{display:block;width:100%;height:auto;margin-top:4px;overflow:visible}
+.draw{stroke-dasharray:420;stroke-dashoffset:420;animation:draw 2.2s .5s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.fadein{opacity:0;animation:fi 1s 1.6s forwards}
+@keyframes fi{to{opacity:1}}
+.mcard{background:#1b1d27;border:1px solid #2c2e3a;border-radius:12px;padding:9px 10px;display:flex;align-items:center;gap:9px;margin-bottom:6px}
+.mav{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-weight:800;font-size:12px;color:#12131a;flex:none;position:relative}
+.mav.p::after{content:"";position:absolute;inset:-3px;border:2px solid var(--bad);border-radius:11px;animation:pulse 1.8s infinite}
+@keyframes pulse{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.25)}}
+.minfo{flex:1;min-width:0}
+.minfo b{font-size:12px;display:block}.minfo small{font-size:9.5px;color:var(--muted);white-space:nowrap}
+.pill{font-size:9px;font-weight:700;padding:3px 7px;border-radius:20px;white-space:nowrap}
+.pill.r{background:rgba(255,107,94,.14);color:var(--bad)}.pill.w{background:rgba(255,180,84,.14);color:var(--warn)}
+.msg{background:#23252f;border:1px solid #2c2e3a;border-radius:10px;padding:8px 9px;font-size:10px;line-height:1.4;margin-bottom:6px;color:#dfe2ee}
+.mbtn{display:block;text-align:center;background:rgba(0,194,184,.14);color:var(--acc);border-radius:8px;padding:7px;font-size:10px;font-weight:700}
+.mock-tag{position:absolute;top:-2px;right:2px;font-size:10px;color:var(--faint)}
+.float-chip{position:absolute;z-index:3;background:rgba(21,24,36,.92);border:1px solid var(--line);backdrop-filter:blur(8px);border-radius:14px;padding:10px 13px;font-size:13px;font-weight:600;box-shadow:0 14px 40px rgba(0,0,0,.45);animation:float 6s ease-in-out infinite}
+.float-chip small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+.fc1{left:-34px;top:18%;animation-delay:-2s}.fc2{right:-40px;bottom:14%;animation-delay:-4s}
+.fc1 b{color:var(--good)}
+
+/* секции */
+section{padding:84px 0}
+.sec-label{font-size:13px;font-weight:700;color:var(--acc);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
+h2{font-size:clamp(28px,4vw,42px);line-height:1.1;letter-spacing:-1px;font-weight:800;max-width:720px}
+.sec-sub{color:var(--muted);font-size:17px;margin-top:14px;max-width:620px}
+.cards{display:grid;gap:14px;margin-top:40px}
+.c4{grid-template-columns:repeat(4,1fr)}.c3{grid-template-columns:repeat(3,1fr)}
+.card{background:linear-gradient(180deg,rgba(27,31,46,.85),rgba(21,24,36,.85));border:1px solid var(--line);border-radius:var(--r);padding:24px;position:relative;overflow:hidden;transition:transform .25s,border-color .25s}
+.card:hover{transform:translateY(-4px);border-color:#3a4166}
+.card .ic{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-size:22px;margin-bottom:16px;background:rgba(139,123,255,.12);border:1px solid rgba(139,123,255,.25)}
+.card h3{font-size:18px;line-height:1.25;margin-bottom:8px;letter-spacing:-.2px}
+.card p{color:var(--muted);font-size:14.5px}
+.pain .ic{background:rgba(255,107,94,.1);border-color:rgba(255,107,94,.25)}
+.step-n{font-size:46px;font-weight:800;line-height:1;margin-bottom:10px;letter-spacing:-2px}
+
+/* деньги */
+.money{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+.panel{background:linear-gradient(180deg,#171a28,#121521);border:1px solid var(--line);border-radius:26px;padding:22px;box-shadow:0 30px 70px rgba(0,0,0,.35)}
+.panel-top{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.big{background:var(--surface2);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.big small{color:var(--muted);font-size:12px;font-weight:600}
+.big b{display:block;font-size:26px;letter-spacing:-.8px;margin-top:4px;font-variant-numeric:tabular-nums}
+.big em{font-style:normal;font-size:12px;color:var(--faint)}
+.bars{display:flex;align-items:flex-end;gap:8px;height:150px;padding-top:10px}
+.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%}
+.bar i{display:block;width:100%;border-radius:8px 8px 3px 3px;background:linear-gradient(180deg,var(--acc2),rgba(139,123,255,.25));height:0;transition:height 1.1s cubic-bezier(.2,.8,.2,1)}
+.bar:nth-child(n+6) i{background:linear-gradient(180deg,var(--acc),rgba(0,194,184,.25))}
+.bar span{font-size:10px;color:var(--faint)}
+.panel-cap{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:14px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px}
+.list{list-style:none;margin-top:22px;display:grid;gap:14px}
+.list li{display:flex;gap:12px;color:var(--muted);font-size:16px}
+.list li b{color:var(--text)}
+.list li::before{content:"✓";flex:none;width:24px;height:24px;border-radius:8px;background:rgba(0,194,184,.14);color:var(--acc);display:grid;place-items:center;font-size:13px;font-weight:800;margin-top:1px}
+.disc{font-size:12px;color:var(--faint);margin-top:12px}
+
+/* маркетинг */
+.mk{background:linear-gradient(135deg,rgba(0,194,184,.08),rgba(139,123,255,.1) 60%,rgba(255,126,182,.08));border:1px solid var(--line);border-radius:28px;padding:44px}
+.mk-grid{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:rgba(255,180,84,.14);color:var(--warn);margin-bottom:14px}
+.card .btn{margin-top:18px;width:100%}
+.turnkey{background:linear-gradient(180deg,#171a28,#121521);border:1px solid var(--line);border-radius:26px;padding:34px;display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center;position:relative;overflow:hidden}
+.turnkey::before{content:"";position:absolute;width:340px;height:340px;right:-90px;top:-120px;background:radial-gradient(circle,rgba(255,126,182,.22),transparent 70%)}
+.turnkey>*{position:relative}
+
+/* финал */
+.final{text-align:center;padding:90px 0 70px}
+.final h2{margin:0 auto}
+.final .cta{justify-content:center;margin-top:28px}
+footer{border-top:1px solid var(--line);padding:30px 0 40px;color:var(--faint);font-size:13px}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+/* форма */
+dialog{margin:auto;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:22px;padding:26px;width:min(440px,calc(100vw - 32px));box-shadow:0 40px 100px rgba(0,0,0,.6)}
+dialog::backdrop{background:rgba(5,6,10,.7);backdrop-filter:blur(4px)}
+dialog h3{font-size:21px;letter-spacing:-.4px;margin-bottom:6px}
+dialog p.s{color:var(--muted);font-size:14px;margin-bottom:18px}
+.f{display:block;margin-bottom:12px}
+.f span{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:5px}
+.f input,.f textarea{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:13px;color:var(--text);font:inherit;font-size:16px}
+.f input:focus,.f textarea:focus{outline:2px solid rgba(0,194,184,.5);border-color:transparent}
+.f textarea{min-height:70px;resize:vertical}
+.chk{display:flex;gap:10px;font-size:12px;color:var(--muted);margin:4px 0 16px;align-items:flex-start}
+.chk input{margin-top:2px;width:18px;height:18px;accent-color:var(--acc);flex:none}
+.row{display:flex;gap:10px}.row .btn{flex:1}
+.ok{display:none;text-align:center;padding:14px 0}.ok .big-ic{font-size:44px}
+.err{color:var(--bad);font-size:13px;min-height:18px;margin-bottom:8px}
+
+/* появление */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .7s,transform .7s}
+.rv.in{opacity:1;transform:none}
+
+@media (max-width:900px){
+  .hero{padding-top:30px}
+  .hero .wrap,.money,.mk-grid,.turnkey{grid-template-columns:1fr}
+  .c4{grid-template-columns:1fr 1fr}.c3{grid-template-columns:1fr}
+  .nav-links{display:none}
+  section{padding:60px 0}
+  .mk{padding:26px 20px}.turnkey{padding:24px 20px}
+  .fc1{left:0}.fc2{right:0}
+  .hero-note{display:none}
+  .lead{margin:14px 0 20px}
+  .eyebrow{margin-bottom:14px}
+}
+@media (max-width:520px){
+  .c4{grid-template-columns:1fr}
+  .cta .btn{flex:1 1 100%}
+  h1{font-size:33px;letter-spacing:-1px}
+  .stage{padding-top:30px}
+  .float-chip{display:none}
+  .panel-top{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .draw{stroke-dashoffset:0}.fadein{opacity:1}.rv{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="/">
+      <svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="none" stroke="#2c2e3a" stroke-width="1.5"/><circle cx="15" cy="15" r="8" fill="none" stroke="#2c2e3a" stroke-width="1.5"/><path d="M15 15 L15 2 A13 13 0 0 1 25.2 7.8 Z" fill="#00c2b8" opacity=".4"/><circle cx="15" cy="15" r="2" fill="#00c2b8"/></svg>
+      Klivo
+    </a>
+    <div class="nav-links">
+      <a href="#how">Как работает</a>
+      <a href="#money">Деньги</a>
+      <a href="#courses">Курсы</a>
+      <a href="#turnkey">Маркетинг под ключ</a>
+    </div>
+    <a class="btn btn-ghost btn-sm" href="/app">Войти</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow"><i></i>Для мастеров красоты</div>
+      <h1>Клиентки возвращаются <span class="grad">сами.</span> А вы видите, сколько они приносят.</h1>
+      <p class="lead">Klivo подсказывает, кому написать сегодня, даёт готовый текст сообщения и показывает деньги от каждой клиентки. Один экран в телефоне, без сложных настроек.</p>
+      <div class="cta">
+        <a class="btn btn-main" href="/app">Попробовать бесплатно →</a>
+        <a class="btn btn-ghost" href="#how">Как это работает</a>
+      </div>
+      <div class="hero-note"><span>Вход через Telegram</span><span>Работает в телефоне</span><span>Сейчас бесплатно</span></div>
+    </div>
+
+    <div class="stage" aria-hidden="true">
+      <div class="rings"></div><div class="sweep"></div>
+      <div class="float-chip fc1"><small>Лена вернулась</small><b>+3 500 ₽</b></div>
+      <div class="float-chip fc2"><small>🔔 Сегодня написать</small>3 клиентки</div>
+      <div class="phone">
+        <div class="screen">
+          <div class="ph-head">
+            <div class="ph-brand">
+              <svg width="24" height="24" viewBox="0 0 30 30"><circle cx="15" cy="15" r="13" fill="none" stroke="#2c2e3a" stroke-width="1.5"/><circle cx="15" cy="15" r="8" fill="none" stroke="#2c2e3a" stroke-width="1.5"/><path d="M15 15 L15 2 A13 13 0 0 1 25.2 7.8 Z" fill="#00c2b8" opacity=".4"/><circle cx="15" cy="15" r="2" fill="#00c2b8"/></svg>
+              <div>Klivo<small>кого не забыть сегодня</small></div>
+            </div>
+            <div class="ph-plus">+</div>
+          </div>
+          <div class="tiles">
+            <div class="tile"><small>Принесли клиентки</small><b class="g"><span data-count="184500">184 500</span> ₽</b></div>
+            <div class="tile"><small>Под угрозой</small><b class="r">12 400 ₽</b></div>
+          </div>
+          <div class="chart-box">
+            <small><span>Выручка от постоянных</span><span>6 мес.</span></small>
+            <svg viewBox="0 0 260 80">
+              <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00c2b8" stop-opacity=".45"/><stop offset="1" stop-color="#00c2b8" stop-opacity="0"/></linearGradient></defs>
+              <path class="fadein" fill="url(#ga)" d="M0 62 C26 62 26 52 52 52 S78 56 104 56 S130 36 156 36 S182 28 208 28 S234 8 260 8 L260 80 L0 80 Z"/>
+              <path class="draw" fill="none" stroke="#00c2b8" stroke-width="2.4" stroke-linecap="round" d="M0 62 C26 62 26 52 52 52 S78 56 104 56 S130 36 156 36 S182 28 208 28 S234 8 260 8"/>
+              <circle class="fadein" cx="260" cy="8" r="4" fill="#00c2b8"/>
+            </svg>
+          </div>
+          <div class="mcard">
+            <div class="mav p" style="background:#c77dff">А</div>
+            <div class="minfo"><b>Аня</b><small>раз в 30 дн. · 21&nbsp;000&nbsp;₽</small></div>
+            <span class="pill r">4 дня</span>
+          </div>
+          <div class="msg">Привет, Аня! Ты была у нас 34 дня назад. Самое время обновить маникюр. Есть окошки на этой неделе?</div>
+          <span class="mbtn">Скопировать текст</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="pains">
+  <div class="wrap">
+    <div class="sec-label rv">Знакомо?</div>
+    <h2 class="rv">Клиентка не ушла. Она просто <span class="grad">забыла записаться.</span></h2>
+    <p class="sec-sub rv">Пока вы заняты работой, часть клиенток пропадает тихо. Вы узнаёте об этом, когда в графике появляется «окно».</p>
+    <div class="cards c4 pain">
+      <div class="card rv"><div class="ic">👻</div><h3>Клиентка пропала</h3><p>Прошло два месяца, а вы только сейчас вспомнили, что она ходила каждый месяц.</p></div>
+      <div class="card rv"><div class="ic">🗂️</div><h3>Всё в заметках и чатах</h3><p>Кто когда был, кто просил напомнить, кому что делали. Разбросано по десятку мест.</p></div>
+      <div class="card rv"><div class="ic">💸</div><h3>Непонятно, кто приносит деньги</h3><p>Кто ваши постоянные клиентки и сколько они дают за год. Пока не посчитаешь, не видно.</p></div>
+      <div class="card rv"><div class="ic">✍️</div><h3>Нет сил придумывать тексты</h3><p>«Привет, давно не виделись…» каждый раз заново. Проще отложить на потом.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-label rv">Как это работает</div>
+    <h2 class="rv">Три шага. Занимает минуту <span class="grad">на клиентку.</span></h2>
+    <div class="cards c3">
+      <div class="card rv"><div class="step-n grad">1</div><h3>Добавьте клиентку</h3><p>Имя, средний чек, дата последнего визита и через сколько дней ей пора вернуться. Для ухода после процедуры есть отдельный режим.</p></div>
+      <div class="card rv"><div class="step-n grad">2</div><h3>Откройте «Сегодня»</h3><p>Klivo покажет, кому пора написать. Просроченные подсвечены. К каждой клиентке уже готов текст, остаётся скопировать и отправить.</p></div>
+      <div class="card rv"><div class="step-n grad">3</div><h3>Нажмите «Вернулась»</h3><p>Дата обновится, напоминание сдвинется, а сумма чека добавится к тому, что клиентка принесла вам за всё время.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="money">
+  <div class="wrap money">
+    <div class="rv">
+      <div class="sec-label">Деньги на виду</div>
+      <h2>Сколько принесли клиентки и сколько <span class="grad">можно потерять</span></h2>
+      <ul class="list">
+        <li><span><b>Принесли клиентки.</b> Сумма всех визитов, которые вы отметили. Видно, на ком держится доход.</span></li>
+        <li><span><b>Под угрозой.</b> Чеки тех, кто давно не записывался. Это деньги, которые вернутся после одного сообщения.</span></li>
+        <li><span><b>Всё в телефоне.</b> Откройте утром за кофе и сразу знаете, кому писать.</span></li>
+      </ul>
+    </div>
+    <div class="rv">
+      <div class="panel">
+        <div class="panel-top">
+          <div class="big"><small>Принесли клиентки</small><b class="g" style="color:var(--good)"><span data-count="184500">184 500</span> ₽</b><em>за всё время</em></div>
+          <div class="big"><small>Под угрозой</small><b style="color:var(--bad)">12 400 ₽</b><em>4 клиентки давно не были</em></div>
+        </div>
+        <div class="panel-cap"><span>Выручка от постоянных по неделям</span><span>₽ тыс.</span></div>
+        <div class="bars" id="bars">
+          <div class="bar"><i data-h="38"></i><span>1</span></div>
+          <div class="bar"><i data-h="52"></i><span>2</span></div>
+          <div class="bar"><i data-h="44"></i><span>3</span></div>
+          <div class="bar"><i data-h="61"></i><span>4</span></div>
+          <div class="bar"><i data-h="58"></i><span>5</span></div>
+          <div class="bar"><i data-h="74"></i><span>6</span></div>
+          <div class="bar"><i data-h="83"></i><span>7</span></div>
+          <div class="bar"><i data-h="96"></i><span>8</span></div>
+        </div>
+        <div class="legend"><span><i style="background:var(--acc2)"></i>раньше</span><span><i style="background:var(--acc)"></i>с напоминаниями</span></div>
+      </div>
+      <p class="disc">Пример на выдуманных данных, чтобы показать, как выглядит экран.</p>
+    </div>
+  </div>
+</section>
+
+<section id="marketing">
+  <div class="wrap">
+    <div class="mk rv">
+      <div class="mk-grid">
+        <div>
+          <div class="sec-label">Это тоже маркетинг</div>
+          <h2>Klivo делает за вас <span class="grad">самую дешёвую часть маркетинга</span></h2>
+        </div>
+        <p class="sec-sub" style="margin:0">Вернуть прежнюю клиентку обычно проще и дешевле, чем искать новую. Вам не нужна реклама, чтобы написать тем, кто у вас уже был. Нужна система, которая напомнит вовремя. Это и есть Klivo.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="courses">
+  <div class="wrap">
+    <div class="sec-label rv">Обучение</div>
+    <h2 class="rv">Курсы по маркетингу <span class="grad">для мастеров</span></h2>
+    <p class="sec-sub rv">Как находить новых клиенток и не терять прежних. Без сложных терминов, только то, что работает в вашей нише. Запускаем в ближайшее время.</p>
+    <div class="cards c3">
+      <div class="card rv"><span class="tag">Скоро</span><h3>Первые клиентки из соцсетей</h3><p>Как оформить профиль и рассказывать о работе так, чтобы вам писали и записывались.</p><button class="btn btn-ghost" data-lead="course">Узнать о запуске</button></div>
+      <div class="card rv"><span class="tag">Скоро</span><h3>Контент без студии</h3><p>Рилс и посты на телефон за час в неделю: что снимать мастеру и как не выгорать.</p><button class="btn btn-ghost" data-lead="course">Узнать о запуске</button></div>
+      <div class="card rv"><span class="tag">Скоро</span><h3>Повторные записи</h3><p>Как строить отношения с клиентками, чтобы они приходили снова и приводили подруг.</p><button class="btn btn-ghost" data-lead="course">Узнать о запуске</button></div>
+    </div>
+  </div>
+</section>
+
+<section id="turnkey">
+  <div class="wrap">
+    <div class="turnkey rv">
+      <div>
+        <div class="sec-label">Маркетинг под ключ</div>
+        <h2>Не хотите разбираться сами? <span class="grad">Мы возьмём это на себя.</span></h2>
+        <p class="sec-sub">Команда M4RKETING подключится к вашей работе: разберёт вашу нишу, оформит профиль, настроит контент и привлечение клиенток. Klivo сделает так, чтобы они потом возвращались.</p>
+        <button class="btn btn-main" style="margin-top:22px" data-lead="turnkey">Обсудить для себя</button>
+      </div>
+      <ul class="list" style="margin:0">
+        <li><span><b>Разбор.</b> Кто ваши клиентки и чем вы отличаетесь.</span></li>
+        <li><span><b>Упаковка.</b> Профиль и контент-план под вашу услугу.</span></li>
+        <li><span><b>Продвижение.</b> Привлечение новых клиенток.</span></li>
+        <li><span><b>Удержание.</b> Klivo подключён, возвраты под контролем.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <h2 class="rv">Начните с трёх клиенток. Остальное <span class="grad">подтянется само.</span></h2>
+    <div class="cta rv">
+      <a class="btn btn-main" href="/app">Попробовать бесплатно →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>© Klivo · klivo.ru</span>
+    <span>Сделано командой M4RKETING</span>
+  </div>
+</footer>
+
+<dialog id="dlg">
+  <form id="leadForm" method="dialog" novalidate>
+    <h3 id="dlgTitle">Оставить заявку</h3>
+    <p class="s" id="dlgSub">Напишем вам и расскажем подробности.</p>
+    <div id="formBody">
+      <label class="f"><span>Как к вам обращаться</span><input name="name" autocomplete="name" maxlength="80" required></label>
+      <label class="f"><span>Telegram (@ник) или телефон</span><input name="contact" autocomplete="tel" maxlength="120" required></label>
+      <label class="f"><span>Чем вы занимаетесь (необязательно)</span><textarea name="message" maxlength="1000" placeholder="Например: маникюр, 2 года, хочу больше постоянных клиенток"></textarea></label>
+      <label class="chk"><input type="checkbox" name="consent"><span>Согласна на обработку моих данных, чтобы со мной связались по этой заявке.</span></label>
+      <div class="err" id="err"></div>
+      <div class="row"><button type="button" class="btn btn-ghost" id="dlgClose">Закрыть</button><button type="submit" class="btn btn-main" id="send">Отправить</button></div>
+    </div>
+    <div class="ok" id="ok"><div class="big-ic">✅</div><h3>Заявка отправлена</h3><p class="s">Мы свяжемся с вами в ближайшее время.</p><button type="button" class="btn btn-ghost" id="okClose" style="width:100%">Закрыть</button></div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+  // появление блоков при прокрутке
+  var els=document.querySelectorAll('.rv');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+    els.forEach(function(el){io.observe(el)});
+  } else els.forEach(function(el){el.classList.add('in')});
+
+  // столбики растут, когда блок виден
+  var bars=document.getElementById('bars');
+  function grow(){bars.querySelectorAll('i').forEach(function(i,n){setTimeout(function(){i.style.height=i.dataset.h+'%'},n*80)})}
+  if('IntersectionObserver' in window){
+    var bo=new IntersectionObserver(function(es){if(es[0].isIntersecting){grow();bo.disconnect()}},{threshold:.4});bo.observe(bars);
+  } else grow();
+
+  // счётчик денег
+  document.querySelectorAll('[data-count]').forEach(function(el){
+    var to=+el.dataset.count,t0=null,reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if(reduce)return;
+    function step(t){if(!t0)t0=t;var p=Math.min((t-t0)/1600,1),v=Math.round(to*(1-Math.pow(1-p,3)));
+      el.textContent=v.toLocaleString('ru-RU').replace(/ /g,' ');if(p<1)requestAnimationFrame(step)}
+    requestAnimationFrame(step);
+  });
+
+  // форма заявки
+  var dlg=document.getElementById('dlg'),form=document.getElementById('leadForm'),kind='other';
+  var titles={course:['Узнать о запуске курсов','Напишем, когда откроем набор.'],turnkey:['Маркетинг под ключ','Расскажите о себе, и мы вернёмся с предложением.'],other:['Оставить заявку','Напишем вам и расскажем подробности.']};
+  document.querySelectorAll('[data-lead]').forEach(function(b){
+    b.addEventListener('click',function(){
+      kind=b.dataset.lead;var t=titles[kind]||titles.other;
+      document.getElementById('dlgTitle').textContent=t[0];document.getElementById('dlgSub').textContent=t[1];
+      document.getElementById('formBody').style.display='';document.getElementById('ok').style.display='none';
+      document.getElementById('err').textContent='';
+      if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');
+    });
+  });
+  function close(){dlg.close?dlg.close():dlg.removeAttribute('open')}
+  document.getElementById('dlgClose').onclick=close;document.getElementById('okClose').onclick=close;
+  dlg.addEventListener('click',function(e){if(e.target===dlg)close()});
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    var f=form.elements,err=document.getElementById('err');
+    if(!f.name.value.trim()||f.contact.value.trim().length<3){err.textContent='Укажите имя и как с вами связаться.';return}
+    if(!f.consent.checked){err.textContent='Нужно согласие на обработку данных.';return}
+    var btn=document.getElementById('send');btn.disabled=true;err.textContent='';
+    fetch('/api/lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:kind,name:f.name.value,contact:f.contact.value,message:f.message.value,consent:true})})
+      .then(function(r){
+        if(r.status===429)throw new Error('Подождите несколько секунд и попробуйте снова.');
+        if(!r.ok)throw new Error('Не получилось отправить. Попробуйте ещё раз.');
+        document.getElementById('formBody').style.display='none';document.getElementById('ok').style.display='block';form.reset();
+      }).catch(function(x){err.textContent=x.message||'Ошибка сети.'})
+      .then(function(){btn.disabled=false});
+  });
+})();
+</script>
+</body>
+</html>
