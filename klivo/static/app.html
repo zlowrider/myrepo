@@ -273,6 +273,12 @@
   .sum-val { font-size: 20px; font-weight: 800; margin-top: 4px; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
   .sum-val.good { color: var(--good); } .sum-val.bad { color: var(--urgent); }
   .sum-sub { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+  .banner { background: var(--accent-soft); border: 1px solid rgba(0,194,184,.35); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; line-height: 1.45; }
+  .banner b { color: var(--accent); }
+  .banner button { margin-top: 8px; width: 100%; }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0 14px; font-size: 14px; }
+  .switch input { width: 22px; height: 22px; accent-color: var(--accent); }
+  select.sel { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; color: var(--text); font-size: 14px; }
   .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
 </style>
 </head>
@@ -314,6 +320,7 @@
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
+      <button class="add-btn" id="setBtn" title="Напоминания" style="font-size:16px;background:var(--surface-2);color:var(--text-muted)">🔔</button>
       <button class="add-btn" id="logoutBtn" title="Выйти" style="font-size:14px;background:var(--surface-2);color:var(--text-muted)">⎋</button>
       <button class="add-btn" id="addBtn">+</button>
     </div>
@@ -374,6 +381,22 @@
     </div>
     <div style="text-align:center; margin-top:10px;">
       <button class="btn-danger-text" id="deleteBtn" style="display:none;">Удалить клиента</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="setOverlay">
+  <div class="sheet">
+    <div class="sheet-title">Напоминания в Telegram</div>
+    <div id="botStatus" class="banner" style="display:none"></div>
+    <label class="switch"><span>Присылать утром список, кому написать</span><input type="checkbox" id="sOn"></label>
+    <div class="field">
+      <label>Во сколько присылать (ваше время)</label>
+      <select class="sel" id="sHour"></select>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-secondary" id="sCancel">Закрыть</button>
+      <button class="btn-primary" id="sSave">Сохранить</button>
     </div>
   </div>
 </div>
@@ -546,6 +569,46 @@
     return saving;
   }
 
+  /* ---------- Напоминания ---------- */
+  var settings = null;
+  async function loadSettings(){
+    try {
+      api('PUT','/api/settings',{tz: -new Date().getTimezoneOffset()}).catch(function(){});
+      settings = await api('GET','/api/settings');
+      render();
+    } catch(e){}
+  }
+  function openSettings(){
+    if (!settings) return;
+    var sel = document.getElementById('sHour');
+    if (!sel.options.length){
+      for (var h=5; h<=22; h++){ var o=document.createElement('option'); o.value=h; o.textContent=pad(h)+':00'; sel.appendChild(o); }
+    }
+    sel.value = settings.remind_hour; document.getElementById('sOn').checked = settings.remind_on;
+    var st = document.getElementById('botStatus');
+    if (!settings.bot){ st.style.display='none'; }
+    else if (!settings.bot_ok){
+      st.style.display='block';
+      st.innerHTML = 'Чтобы бот мог вам писать, откройте его и нажмите <b>Start</b>: <a href="https://t.me/'+settings.bot+'?start=app" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">@'+settings.bot+'</a>';
+    } else { st.style.display='block'; st.innerHTML = '✅ Бот подключён, напоминания придут в Telegram.'; }
+    document.getElementById('setOverlay').classList.add('show');
+  }
+  document.getElementById('setBtn').addEventListener('click', openSettings);
+  document.getElementById('sCancel').addEventListener('click', function(){ document.getElementById('setOverlay').classList.remove('show'); });
+  document.getElementById('setOverlay').addEventListener('click', function(e){ if (e.target.id==='setOverlay') e.target.classList.remove('show'); });
+  document.getElementById('sSave').addEventListener('click', async function(){
+    try {
+      await api('PUT','/api/settings',{remind_on: document.getElementById('sOn').checked, remind_hour: +document.getElementById('sHour').value});
+      settings = await api('GET','/api/settings');
+      document.getElementById('setOverlay').classList.remove('show'); showToast('Сохранено'); render();
+    } catch(e){ showToast('Не удалось сохранить'); }
+  });
+  function botBanner(){
+    if (!settings || !settings.bot || settings.bot_ok) return '';
+    return '<div class="banner"><b>Включите утренние напоминания.</b> Нажмите Start в боте @'+settings.bot+', и каждое утро он будет присылать список, кому написать.'+
+      '<button class="btn btn-copy" onclick="document.getElementById(\'setBtn\').click()">Подключить</button></div>';
+  }
+
   /* ---------- Вход ---------- */
   function showLogin(){
     document.getElementById('app').style.display = 'none';
@@ -554,7 +617,7 @@
   function showApp(){
     document.getElementById('login').classList.remove('show');
     document.getElementById('app').style.display = '';
-    loadData();
+    loadData(); loadSettings();
   }
   async function initAuth(){
     var tg = window.Telegram && Telegram.WebApp;
@@ -628,15 +691,15 @@
       : sorted;
 
     if (clients.length === 0){
-      main.innerHTML = emptyHTML('Пока пусто', 'Добавь первого клиента кнопкой «+» вверху — впиши имя, дату последнего визита и как часто он должен возвращаться.');
+      main.innerHTML = botBanner() + emptyHTML('Пока пусто', 'Добавь первого клиента кнопкой «+» вверху — впиши имя, дату последнего визита и как часто он должен возвращаться.');
       return;
     }
     if (list.length === 0){
-      main.innerHTML = emptyHTML('Сегодня писать некому', 'Все клиенты в порядке. Загляни во вкладку «Все клиенты», чтобы посмотреть на всех.');
+      main.innerHTML = botBanner() + emptyHTML('Сегодня писать некому', 'Все клиенты в порядке. Загляни во вкладку «Все клиенты», чтобы посмотреть на всех.');
       return;
     }
 
-    main.innerHTML = summaryHTML(sorted) + list.map(cardHTML).join('');
+    main.innerHTML = botBanner() + summaryHTML(sorted) + list.map(cardHTML).join('');
     bindCardEvents();
   }
 

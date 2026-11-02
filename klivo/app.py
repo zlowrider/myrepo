@@ -88,6 +88,14 @@ def init_db():
       updated INTEGER NOT NULL,
       PRIMARY KEY(user_id, id));
     """)
+    have = {r[1] for r in c.execute("PRAGMA table_info(users)")}
+    for col, ddl in (("remind_on", "INTEGER NOT NULL DEFAULT 1"),
+                     ("remind_hour", "INTEGER NOT NULL DEFAULT 9"),
+                     ("tz", "INTEGER NOT NULL DEFAULT 180"),        # смещение от UTC в минутах (Москва)
+                     ("bot_ok", "INTEGER NOT NULL DEFAULT 0"),      # бот может писать (пользователь нажал Start)
+                     ("last_reminded", "TEXT NOT NULL DEFAULT ''")):
+        if col not in have:
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
     c.commit()
     c.close()
 
@@ -193,6 +201,48 @@ def me():
         session.clear()
         abort(401)
     return jsonify(dict(u))
+
+
+SETTINGS_COLS = "remind_on,remind_hour,tz,bot_ok"
+
+
+@app.get("/api/settings")
+def get_settings():
+    uid = need_user()
+    r = db().execute(f"SELECT {SETTINGS_COLS} FROM users WHERE id=?", (uid,)).fetchone()
+    if not r:
+        abort(401)
+    return jsonify(remind_on=bool(r["remind_on"]), remind_hour=r["remind_hour"], tz=r["tz"],
+                   bot_ok=bool(r["bot_ok"]), bot=BOT_USERNAME)
+
+
+@app.put("/api/settings")
+def put_settings():
+    uid = need_user()
+    d = request.get_json(silent=True) or {}
+    sets, vals = [], []
+    if "remind_on" in d:
+        sets.append("remind_on=?"); vals.append(1 if d["remind_on"] else 0)
+    if "remind_hour" in d:
+        try:
+            h = int(d["remind_hour"])
+        except (TypeError, ValueError):
+            abort(400)
+        if not 0 <= h <= 23:
+            abort(400)
+        sets.append("remind_hour=?"); vals.append(h)
+    if "tz" in d:
+        try:
+            tz = int(d["tz"])
+        except (TypeError, ValueError):
+            abort(400)
+        if not -720 <= tz <= 840:
+            abort(400)
+        sets.append("tz=?"); vals.append(tz)
+    if sets:
+        db().execute(f"UPDATE users SET {', '.join(sets)} WHERE id=?", (*vals, uid))
+        db().commit()
+    return jsonify(ok=True)
 
 
 @app.post("/api/logout")

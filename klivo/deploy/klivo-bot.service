@@ -1,0 +1,13 @@
+[Unit]
+Description=Klivo Telegram bot (напоминания)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/klivo
+EnvironmentFile=/opt/klivo/.env
+ExecStart=/opt/klivo/.venv/bin/python bot.py
+Restart=always
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
